@@ -68,7 +68,7 @@ fn remove_space(command: &mut String) {
     *command = command.chars().filter(|&c| c != ' ').collect();
 }
 
-pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32){
+pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32, sheet: &mut Sheet){
     let mut command = command.trim().to_string();
     // remove_space(&mut command);
 
@@ -148,7 +148,12 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && (op == '+' || op == '-' || op == '*' || op == '/') {
             let ans = compute_cell(op, val1, val2, status);
-            // TODO: Add sheet.data access
+            sheet.data[row as usize][col as usize].value = ans;
+            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell1 = CellInfo { row: -1, col: -1 };
+            let cell2 = CellInfo { row: -1, col: -1 };
+            let op_code = 'X';
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
@@ -173,7 +178,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
            is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) && 
            is_valid_cell(val_row2 - 1, col2, *total_rows, *total_cols) && 
            (op == '+' || op == '-' || op == '*' || op == '/') {
-            // TODO: Add constraints
+            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
+            let cell2 = CellInfo { row: val_row2 as i32 - 1, col: col2 as i32 };
+            
+            sheet_functions::add_constraints(cell, cell1, cell2, op, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
@@ -201,11 +210,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let const2 = (val1 >> 16) & 0xFFFF;
             
             let op_code = get_op_code(op, true);
-            let cell = CellInfo { row: row as i16, col: col as i16 };
-            let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
-            let cell2 = CellInfo { row: const2 as i16, col: const1 as i16 };
+            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
+            let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
             
-            // TODO: Add constraints
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
@@ -233,11 +242,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let const2 = (val1 >> 16) & 0xFFFF;
             
             let op_code = get_op_code(op, false);
-            let cell = CellInfo { row: row as i16, col: col as i16 };
-            let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
-            let cell2 = CellInfo { row: const2 as i16, col: const1 as i16 };
+                            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
+            let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
             
-            // TODO: Add constraints
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
@@ -264,11 +273,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
            val_row1 <= val_row2 && col1 <= col2 {
             
             let op_code = func_to_op_code(func_name);
-            let cell = CellInfo { row: row as i16, col: col as i16 };
-            let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
-            let cell2 = CellInfo { row: val_row2 as i16 - 1, col: col2 as i16 };
+            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
+            let cell2 = CellInfo { row: val_row2 as i32 - 1, col: col2 as i32 };
             
-            // TODO: Add constraints
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
@@ -281,16 +290,16 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap();
         
         let col = col_name_to_col_num(ref_col);
-        let row = ref_row - 1;
-        println!("haha");
-        if is_valid_cell(row, col, *total_rows, *total_cols) {
-            // TODO: Add sheet.data access
+        let row = ref_row - 1; 
+        if is_valid_cell(row, col, *total_rows, *total_cols) { 
+            sheet.data[row as usize][col as usize].value = val1;
+            sheet.data[row as usize][col as usize].is_error = false;
             *status = String::from("ok");
-            let cell = CellInfo { row: row as i16, col: col as i16 };
+            let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            
-            // TODO: Add constraints
+            let op_code = 'X';
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
@@ -309,11 +318,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let row1 = val_row1 - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
-            let cell = CellInfo { row: row as i16, col: col as i16 };
-            let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
+            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell1 = CellInfo { row: row1 as i32, col: col1 as i32 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            
-            // TODO: Add constraints
+            let op_code = '=';
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
@@ -329,13 +338,13 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let row = ref_row - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) {
-            // TODO: Add sheet.data access
             *status = String::from("ok");
-            let cell = CellInfo { row: row as i16, col: col as i16 };
+            let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             
-            // TODO: Add constraints 
+            let op_code = 'X';
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             if val1 >= 0 {
                 thread::sleep(Duration::from_secs(val1 as u64));
             }
@@ -358,11 +367,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let row1 = val_row1 - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
-            let cell = CellInfo { row: row as i16, col: col as i16 };
-            let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
+            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell1 = CellInfo { row: row1 as i32, col: col1 as i32 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            
-            // TODO: Add constraints
+            let op_code = 'Z';
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");
