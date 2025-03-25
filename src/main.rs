@@ -1,6 +1,7 @@
 use std::env;
 mod sheet_functions;
 mod parser;
+mod calculate_functions;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -17,7 +18,7 @@ fn main() {
     let mut status = String::new();
     status.push_str("ok");
     loop{
-        sheet_functions::print_sheet(row_start, col_start, row, col);
+        sheet_functions::print_sheet(row_start, col_start, row, col );
         println!("[{:.1}] ({}) >", time, status);
         let mut command = String::new();
         std::io::stdin().read_line(&mut command).unwrap();

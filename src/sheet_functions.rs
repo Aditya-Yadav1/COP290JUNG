@@ -1,3 +1,63 @@
+
+pub struct CellInfo {
+    pub row: i16,
+    pub col: i16,
+}
+ 
+pub struct DependencyNode {
+    pub data: i32,
+    pub next: Option<Box<DependencyNode>>,
+}
+ 
+pub struct Cell {
+    pub value: i32,
+    pub is_error: bool,
+    pub op_code: char,
+    pub cell1: CellInfo,
+    pub cell2: CellInfo,
+    pub dependencies: Option<Box<DependencyNode>>,
+}
+ 
+pub struct Sheet {
+    pub rows: i32,
+    pub cols: i32,
+    pub data: Vec<Vec<Cell>>,
+}
+
+
+// is_valid_cell
+pub fn is_valid_cell(row: i32, col: i32, total_rows: i32, total_cols: i32) -> bool {
+    row >= 0 && row < total_rows && col >= 0 && col < total_cols
+}           
+
+
+impl Sheet {
+    pub fn new(m: i32, n: i32) -> Self {
+        let mut data = Vec::with_capacity(m as usize);
+        for _ in 0..m {
+            let mut row = Vec::with_capacity(n as usize);
+            for _ in 0..n {
+                row.push(Cell {
+                    value: 0,
+                    is_error: false,
+                    op_code: 'X',
+                    cell1: CellInfo { row: -1, col: -1 },
+                    cell2: CellInfo { row: -1, col: -1 },
+                    dependencies: None,
+                });
+            }
+            data.push(row);
+        }
+        Sheet {
+            rows: m,
+            cols: n,
+            data,
+        }
+    }
+}
+
+
+
 pub fn col_num_to_col_name(col_num: i32) -> String {
     let mut col_name = String::new();
     let mut col_num = col_num;
