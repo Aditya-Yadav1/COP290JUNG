@@ -1,19 +1,21 @@
 use crate::calculate_functions::compute_cell;
 use crate::calculate_functions::compute_range_func;
 use crate::calculate_functions;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
+
 
 #[derive(Clone)]
 pub struct CellInfo {
     pub row: i32,
     pub col: i32,
 }
- 
+
+#[derive(Clone)]
 pub struct DependencyNode {
     pub data: i32,
     pub next: Option<Box<DependencyNode>>,
 }
- 
+#[derive(Clone)]
 pub struct Cell {
     pub value: i32,
     pub is_error: bool,
@@ -22,7 +24,8 @@ pub struct Cell {
     pub cell2: CellInfo,
     pub dependencies: Option<Box<DependencyNode>>,
 }
- 
+
+#[derive(Clone)]
 pub struct Sheet {
     pub rows: i32,
     pub cols: i32,
@@ -180,7 +183,99 @@ pub fn recalculate(cell: &mut Cell, sheet: &mut Sheet, sleep_timer: &mut i32) {
 
 }
   
-
+pub fn recalculate_all(sheet: &mut Sheet, changed_cell: CellInfo) {
+    // Build a map of cells and their dependents
+    let mut dependents_map: HashMap<(i32, i32), Vec<(i32, i32)>> = HashMap::new();
+    
+    // First pass: build the dependency graph
+    for i in 0..sheet.rows {
+        for j in 0..sheet.cols {
+            // Skip cells with no operations
+            if sheet.data[i as usize][j as usize].op_code == '\0' || 
+               sheet.data[i as usize][j as usize].op_code == 'X' {
+                continue;
+            }
+            
+            let cell = &sheet.data[i as usize][j as usize];
+            
+            // Add first dependency
+            if cell.cell1.row >= 0 && cell.cell1.col >= 0 {
+                let dep_key = (cell.cell1.row, cell.cell1.col);
+                dependents_map.entry(dep_key).or_insert(Vec::new()).push((i, j));
+            }
+            
+            // Add second dependency if it exists
+            if cell.cell2.row >= 0 && cell.cell2.col >= 0 && 
+               (cell.op_code == '+' || cell.op_code == '-' || 
+                cell.op_code == '*' || cell.op_code == '/' || 
+                cell.op_code == 'S' || cell.op_code == 'm' || 
+                cell.op_code == 'M' || cell.op_code == 'A' || 
+                cell.op_code == 'D') {
+                
+                // For range functions, add all cells in the range as dependencies
+                if cell.op_code == 'S' || cell.op_code == 'm' || 
+                   cell.op_code == 'M' || cell.op_code == 'A' || 
+                   cell.op_code == 'D' {
+                    for r in cell.cell1.row..=cell.cell2.row {
+                        for c in cell.cell1.col..=cell.cell2.col {
+                            let dep_key = (r, c);
+                            dependents_map.entry(dep_key).or_insert(Vec::new()).push((i, j));
+                        }
+                    }
+                } else {
+                    // For regular binary operations
+                    let dep_key = (cell.cell2.row, cell.cell2.col);
+                    dependents_map.entry(dep_key).or_insert(Vec::new()).push((i, j));
+                }
+            }
+        }
+    }
+    
+    // Queue for BFS, starting from the changed cell
+    let mut queue = VecDeque::new();
+    queue.push_back((changed_cell.row, changed_cell.col));
+    
+    // Set to keep track of cells already queued
+    let mut visited = HashSet::new();
+    visited.insert((changed_cell.row, changed_cell.col));
+    
+    // Set to detect circular dependencies
+    let mut circular_detected = HashSet::new();
+    
+    // Sleep timer for Z operations
+    let mut sleep_timer = 0;
+    
+    // Perform BFS to update all dependent cells
+    while let Some((row, col)) = queue.pop_front() {
+        // Skip if this is not a changed cell
+        if row != changed_cell.row || col != changed_cell.col {
+            // Update the cell value
+            let mut cell = sheet.data[row as usize][col as usize].clone();
+            recalculate(&mut cell, sheet, &mut sleep_timer);
+            sheet.data[row as usize][col as usize] = cell;
+        }
+        
+        // Add dependents to the queue
+        if let Some(deps) = dependents_map.get(&(row, col)) {
+            for (dep_row, dep_col) in deps {
+                // Check for circular dependency
+                if circular_detected.contains(&(*dep_row, *dep_col)) {
+                    // Mark the cell as having an error
+                    sheet.data[*dep_row as usize][*dep_col as usize].is_error = true;
+                    continue;
+                }
+                
+                circular_detected.insert((*dep_row, *dep_col));
+                
+                // Only add to queue if not already visited
+                if !visited.contains(&(*dep_row, *dep_col)) {
+                    visited.insert((*dep_row, *dep_col));
+                    queue.push_back((*dep_row, *dep_col));
+                }
+            }
+        }
+    }
+}
 
 
 pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op_code: char, sheet: &mut Sheet, status: &mut String, sleep_timer: &mut i32) {
@@ -314,7 +409,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     if cell.op_code == 'Z' {
         *sleep_timer += ans;
     }
-
+    recalculate_all(sheet, curr_cell);
     // TODO: Implement topological 
 }
 

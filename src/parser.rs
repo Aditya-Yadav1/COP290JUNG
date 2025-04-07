@@ -1,10 +1,10 @@
 use std::thread;
-use std::env; 
+use std::env;
 use std::time::Duration;
 use regex::Regex;
 use crate::sheet_functions;
 use crate::sheet_functions::col_name_to_col_num;
-use crate::sheet_functions::CellInfo; 
+use crate::sheet_functions::CellInfo;
 use crate::calculate_functions::compute_cell;   
 use crate::sheet_functions::is_valid_cell;
 use crate::sheet_functions::Sheet;
@@ -108,7 +108,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         },
         _ => {} // Continue with complex patterns
     }
-    let re_scroll_to = Regex::new(r"^scroll_to([A-Z]+)(\d+)$").unwrap();
+    let re_scroll_to = Regex::new(r"^scroll_to\(([A-Z]+)(\d+)\)$").unwrap();
     let re_cell_eq_int_op_int = Regex::new(r"^([A-Z]+)(\d+)=(\d+)([+\-*/])(\d+)$").unwrap();
     let re_cell_eq_cell_op_cell = Regex::new(r"^([A-Z]+)(\d+)=([A-Z]+)(\d+)([+\-*/])([A-Z]+)(\d+)$").unwrap();
     let re_cell_eq_int_op_cell = Regex::new(r"^([A-Z]+)(\d+)=(\d+)([+\-*/])([A-Z]+)(\d+)$").unwrap();
