@@ -25,6 +25,7 @@ fn main() {
         let mut command = String::new();
         std::io::stdin().read_line(&mut command).unwrap();
         parser::parse_command(&command, &mut row_start, &mut col_start, &mut time, &mut status, &row, &col, &mut sheet);
+        
     }
     
     
