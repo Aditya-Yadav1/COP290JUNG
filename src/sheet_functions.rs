@@ -136,8 +136,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
     let (op_code, cell1, cell2) = {
         let c = &mut sheet.data[row][col];
         (c.op_code, c.cell1.clone(), c.cell2.clone())
-    };
-    println!("{:?},", op_code, );
+    }; 
     if op_code == 'X' {
         return;
     }
@@ -311,23 +310,12 @@ pub fn add_to_tree(mut avl_tree: &mut std::collections::HashMap<i32, i32>, cell:
 pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op_code: char, sheet: &mut Sheet, status: &mut String, sleep_timer: &mut i32) {
     let curr_cell_row_col = curr_cell.col * 1000 + curr_cell.row;
     let mut ans = 0;
-    let mut calc_error = false;
+    let mut calc_error = false; 
     // Create a HashMap named avl_tree where the key is curr_cell_row_col and the value is indegree (0 by default)
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(curr_cell_row_col, 0);
 
-    add_to_tree(&mut avl_tree, curr_cell.clone(), sheet);  
-    println!("[avl_tree: {:?}]", avl_tree);
-    //print dependecies of curr_cell
-    println!("Dependencies of cells from A1 to A4:");
-    for row in 0..4 {
-        let cell = &sheet.data[row][0]; // Column A corresponds to index 0
-        let cell_name = format!("A{}", row + 1);
-        println!("Cell {} dependencies:", cell_name);
-        for &dep in &cell.dependencies {  
-            println!("  Dependent cell: {}", dep);
-        }
-    }
+    add_to_tree(&mut avl_tree, curr_cell.clone(), sheet);   
     match op_code {
         'X' => {
             ans = sheet.data[curr_cell.row as usize][curr_cell.col as usize].value;
@@ -339,8 +327,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         },
         '=' => {
             if check_cycle(&avl_tree, &cell1, &cell2) {
-                *status = String::from("circular error");
-                println!("circular error");
+                *status = String::from("circular error"); 
                 return;
             }
             remove_dependency(&curr_cell, sheet);
@@ -358,8 +345,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         },
         'p' | 's' | 'u' | 'd' | 'b' | 'Z' => {
             if check_cycle(&avl_tree, &cell1, &cell2) {
-                *status = String::from("circular error");
-                println!("circular error");
+                *status = String::from("circular error"); 
                 return;
             }
             remove_dependency(&curr_cell, sheet);
@@ -367,8 +353,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell1 = cell1.clone();
             cell.cell2 = cell2.clone();
             cell.op_code = op_code; 
-            let value = (cell2.row as i32) << 16 | (cell2.col as i32 & 0xFFFF);
-            println!("[value: {}]", value);
+            let value = (cell2.row as i32) << 16 | (cell2.col as i32 & 0xFFFF); 
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
                 calc_error = true;
             } else {
@@ -421,9 +406,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         },
         '+' | '-' | '*' | '/' => {
             if check_cycle(&avl_tree, &cell1, &cell2) {
-                *status = String::from("circular error");
-                println!("circular error");
-                println!("[status: {}]", status);
+                *status = String::from("circular error"); 
                 return;
             }
             remove_dependency(&curr_cell, sheet);
@@ -459,8 +442,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     if cell.op_code == 'Z' {
         *sleep_timer += ans;
     }
-    let sorted = topological_sort(&mut avl_tree, &sheet); 
-    println!("[sorted: {:?}]", sorted);
+    let sorted = topological_sort(&mut avl_tree, &sheet);  
     *status = String::from("ok");
 
     for i in sorted.into_iter(){

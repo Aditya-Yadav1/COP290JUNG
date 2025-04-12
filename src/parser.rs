@@ -1,5 +1,4 @@
-use std::thread;
-use std::env;
+use std::thread; 
 use std::time::Duration;
 use regex::Regex;
 use crate::sheet_functions;
@@ -39,17 +38,17 @@ pub fn get_op_code(op_code: char, constopcell: bool) -> char {
     }
 }
 
-pub fn get_op_code_rev(op_code: char) -> char {
-    // function to get operation from opcode for the case of int op cell or cell op int
-    match op_code {
-        'p' => '+',
-        's' => '-',
-        'u' => '*',
-        'd' => '/',
-        'b' => '/',
-        _ => '\0'
-    }
-}
+// pub fn get_op_code_rev(op_code: char) -> char {
+//     // function to get operation from opcode for the case of int op cell or cell op int
+//     match op_code {
+//         'p' => '+',
+//         's' => '-',
+//         'u' => '*',
+//         'd' => '/',
+//         'b' => '/',
+//         _ => '\0'
+//     }
+// }
 
 pub fn func_to_op_code(func: &str) -> char {
     // function for getting opcode for the case of func(cell:cell)
@@ -70,7 +69,7 @@ fn remove_space(command: &mut String) {
 
 pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32, sheet: &mut Sheet){
     let mut command = command.trim().to_string();
-    // remove_space(&mut command);
+    remove_space(&mut command);
 
     match command.as_str() {
         "w" =>{
@@ -114,7 +113,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
     let re_cell_eq_int_op_cell = Regex::new(r"^([A-Z]+)(\d+)=(\d+)([+\-*/])([A-Z]+)(\d+)$").unwrap();
     let re_cell_eq_cell_op_int = Regex::new(r"^([A-Z]+)(\d+)=([A-Z]+)(\d+)([+\-*/])(\d+)$").unwrap();
     let re_cell_eq_func = Regex::new(r"^([A-Z]+)(\d+)=([A-Z]+)\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)$").unwrap();
-    let re_cell_eq_int = Regex::new(r"^([A-Z]+)(\d+)=(\d+)$").unwrap();
+    let re_cell_eq_int = Regex::new(r"^([A-Z]+)(\d+)=(-?\d+)$").unwrap();
     let re_cell_eq_cell = Regex::new(r"^([A-Z]+)(\d+)=([A-Z]+)(\d+)$").unwrap();
     let re_sleep_int = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\((\d+)\)$").unwrap();
     let re_sleep_cell = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\(([A-Z]+)(\d+)\)$").unwrap();
@@ -240,9 +239,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             
             // Splitting the constant into two 16 bit variables
             let const1 = val1 & 0xFFFF;
-            let const2 = (val1 >> 16) & 0xFFFF;
-            println!("HAHA");
-            println!("{} {} {} {}", const1, const2, val1, op);
+            let const2 = (val1 >> 16) & 0xFFFF; 
             let op_code = get_op_code(op, false);
                             let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
@@ -288,7 +285,10 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
     else if let Some(caps) = re_cell_eq_int.captures(&command) {
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
-        let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap();
+        let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap_or_else(|_| {
+            *status = String::from("Invalid cmd");
+            return 0;
+        });
         
         let col = col_name_to_col_num(ref_col);
         let row = ref_row - 1; 

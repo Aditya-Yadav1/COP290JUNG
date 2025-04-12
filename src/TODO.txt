@@ -1,2 +1,5 @@
 once check proper working of graph and cycle
-changing cellinfo from i32 to i16q
+changing cellinfo from i32 to i16
+showing ERR on cell = -1 fix this
+
+    
