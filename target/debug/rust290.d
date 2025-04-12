@@ -1,1 +1,0 @@
-C:\Users\deepa\Desktop\290keChode\COP290JUNG\target\debug\rust290.exe: C:\Users\deepa\Desktop\290keChode\COP290JUNG\src\calculate_functions.rs C:\Users\deepa\Desktop\290keChode\COP290JUNG\src\main.rs C:\Users\deepa\Desktop\290keChode\COP290JUNG\src\parser.rs C:\Users\deepa\Desktop\290keChode\COP290JUNG\src\sheet_functions.rs C:\Users\deepa\Desktop\290keChode\COP290JUNG\src\ui.rs
