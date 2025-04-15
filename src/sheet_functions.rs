@@ -170,7 +170,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             '+' | '-' | '*' | '/' => {
                 let a = &s.data[cell1.row as usize][cell1.col as usize];
                 let b = &s.data[cell2.row as usize][cell2.col as usize];
-                if a.is_error || b.is_error {
+                if a.is_error || b.is_error || a.string.is_some() || b.string.is_some() {
                     err = true;
                 } else {
                     (val, err1) = compute_cell(op_code, a.value, b.value, &mut String::new());
@@ -178,7 +178,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             'p' | 's' | 'u' | 'd' | 'b' => {
                 let a = &s.data[cell1.row as usize][cell1.col as usize];
-                if a.is_error {
+                if a.is_error || a.string.is_some() {
                     err = true;
                 } else {
                     (val, err1) = compute_cell(op_code, a.value, cell2.row << 16 | cell2.col, &mut String::new());
@@ -186,7 +186,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             'Z' => {
                 let a = &s.data[cell1.row as usize][cell1.col as usize];
-                if a.is_error {
+                if a.is_error || a.string.is_some() {
                     err = true;
                 } else {
                     val = a.value;
@@ -197,7 +197,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 // range check
                 for i in cell1.row..=cell2.row {
                     for j in cell1.col..=cell2.col {
-                        if s.data[i as usize][j as usize].is_error {
+                        if s.data[i as usize][j as usize].is_error || s.data[i as usize][j as usize].string.is_some() {
                             err = true;
                             break;
                         }

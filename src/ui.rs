@@ -143,6 +143,7 @@ impl App for SpreadsheetApp {
                     for row in &mut self.sheet.data {
                         for cell in row {
                             cell.value = 0;
+                            cell.string = None;
                             cell.is_error = false;
                             cell.op_code = 'X';
                             cell.cell1 = CellInfo { row: -1, col: -1 };
@@ -173,7 +174,7 @@ impl App for SpreadsheetApp {
 
         // 2) Central panel with sticky headers
         egui::CentralPanel::default().show(ctx, |ui| {
-            let cell_size = egui::vec2(80.0, 30.0);
+            let cell_size = egui::vec2(120.0, 30.0);
             
             // before redering checking mouse scroll
             let scroll_delta = ui.input(|i| i.smooth_scroll_delta);
@@ -285,7 +286,9 @@ impl App for SpreadsheetApp {
                                 // Data cells
                                 for c in self.col_start..(self.col_start + visible_cols).min(self.sheet.cols) {
                                     let cell = &mut self.sheet.data[r as usize][c as usize];
-                                    let display = if cell.is_error {
+                                    let display = if cell.string.is_some() {
+                                        cell.string.as_ref().unwrap().clone()
+                                    } else if cell.is_error {
                                         "Err".to_string()
                                     } else {
                                         cell.value.to_string()

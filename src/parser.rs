@@ -3,10 +3,16 @@ use std::time::Duration;
 use regex::Regex;
 use crate::sheet_functions;
 use crate::sheet_functions::col_name_to_col_num;
+use crate::sheet_functions::remove_dependency;
+use crate::sheet_functions::add_to_tree;
+use crate::sheet_functions::recalculate;
+use crate::sheet_functions::topological_sort;
 use crate::sheet_functions::CellInfo;
 use crate::calculate_functions::compute_cell;   
 use crate::sheet_functions::is_valid_cell;
 use crate::sheet_functions::Sheet;
+use std::collections::{HashMap, HashSet, VecDeque};
+
 /*
     = ->cell
     + -> cell+cell
@@ -135,18 +141,39 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         }
     }
     // Cell = String
-    else if let Some(caps) = re_string_cell.captures(&command){
+    else if let Some(caps) = re_string_cell.captures(&command) {
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let value = caps.get(3).unwrap().as_str();
         let c = col_name_to_col_num(ref_col);
         let r = ref_row - 1;
-        if is_valid_cell(r, c, *total_rows, *total_cols){
-            let cell = & mut sheet.data[r as usize][c as usize];
-            let value = value.to_string();
-            cell.string = Some(value);
-    }
+        if is_valid_cell(r, c, *total_rows, *total_cols) {
+            {
+            let cell = &mut sheet.data[r as usize][c as usize];
+            cell.string = Some(value.to_string());
+            cell.value = 0; // Reset value as it's a string
+            cell.is_error = false;
+            cell.op_code = 'X';
+            cell.cell1 = CellInfo { row: -1, col: -1 };
+            cell.cell2 = CellInfo { row: -1, col: -1 };}
+            // Clear existing constraints}
+            remove_dependency(&CellInfo { row: r, col: c }, sheet);
+            // Set cell metadata
 
+            // Trigger recalculation of dependent cells
+            let mut avl_tree: HashMap<i32, i32> = HashMap::new();
+            avl_tree.insert(c * 1000 + r, 0);
+            add_to_tree(&mut avl_tree, CellInfo { row: r, col: c }, sheet);
+            let sorted = topological_sort(&mut avl_tree, &sheet);
+            for i in sorted {
+                let row = i % 1000;
+                let col = i / 1000;
+                recalculate(sheet, row as usize, col as usize, &mut 0);
+            }
+            *status = String::from("ok");
+        } else {
+            *status = String::from("Invalid cmd");
+        }
     }
 
     // Cell = int op int
