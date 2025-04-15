@@ -141,16 +141,16 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap();
         let op = caps.get(4).unwrap().as_str().chars().next().unwrap();
         let val2: i32 = caps.get(5).unwrap().as_str().parse().unwrap();
+
         
         let col = col_name_to_col_num(ref_col);
         let row = ref_row - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && (op == '+' || op == '-' || op == '*' || op == '/') {
-            let ans = compute_cell(op, val1, val2, status);
+            let (  ans, err) = compute_cell(op, val1, val2, status);
             sheet.data[row as usize][col as usize].value = ans;
-            if ans == -1 {
-                sheet.data[row as usize][col as usize].is_error = true;
-            }
+            sheet.data[row as usize][col as usize].is_error = err;
+
             let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };

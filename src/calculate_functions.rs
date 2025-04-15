@@ -1,6 +1,5 @@
 // use std::f64::consts::E;
 use crate::sheet_functions::Sheet;
-static mut CALC_ERROR: bool = false;
 
 pub fn sum(sheet: &Sheet, val_row1: i32, c1: i32, val_row2: i32, c2: i32) -> i32 {
     let mut a = 0;
@@ -61,39 +60,33 @@ pub fn stdev(sheet: &Sheet, val_row1: i32, c1: i32, val_row2: i32, c2: i32) -> i
     std.round() as i32
 }
 
-pub fn compute_cell(op_code: char, cell_value: i32, cell_value2: i32, status: &mut String) -> i32 {
-    unsafe {
-        CALC_ERROR = false;
-    }
+pub fn compute_cell(op_code: char, cell_value: i32, cell_value2: i32, status: &mut String) -> (i32, bool){
+
     
     match op_code {
-        '+' | 'p' => cell_value + cell_value2,
-        '-' | 's' => cell_value - cell_value2,
-        '*' | 'u' => cell_value * cell_value2,
+        '+' | 'p' => (cell_value + cell_value2,false),
+        '-' | 's' => (cell_value - cell_value2, false),
+        '*' | 'u' => (cell_value * cell_value2, false),
         '/' | 'd' => {
             if cell_value2 == 0 {
-                unsafe {
-                    CALC_ERROR = true;
-                }
-                -1
+
+                (-1, true)
             } else {
-                cell_value / cell_value2
+                (cell_value / cell_value2,false)
             }
         }
         'b' => {
             if cell_value == 0 {
-                unsafe {
-                    CALC_ERROR = true;
-                }
-                -1
+
+                (-1, true)
             } else {
-                cell_value2 / cell_value
+                (cell_value2 / cell_value, false)
             }
         }
-        'Z' => cell_value,
+        'Z' => (cell_value, false),
         _ => {
             status.push_str("Invalid cmd");
-            -1
+            (-1, true)
         }
     }
 }

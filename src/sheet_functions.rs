@@ -142,13 +142,14 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
     }
 
     // ── 2) Compute the new value, error flag, and any sleep delta using *only* immutable borrows ──
-    let (new_value, is_error, delta) = {
+    let (new_value, is_error,is_error2, delta) = {
         // Immutable borrow of the whole sheet
         let s = &*sheet;
 
         let mut err = false;
         let mut val = 0;
         let mut d = 0;
+        let mut err1: bool = false;
 
         match op_code {
             '=' => {
@@ -165,7 +166,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 if a.is_error || b.is_error {
                     err = true;
                 } else {
-                    val = compute_cell(op_code, a.value, b.value, &mut String::new());
+                    (val, err1) = compute_cell(op_code, a.value, b.value, &mut String::new());
                 }
             }
             'p' | 's' | 'u' | 'd' | 'b' => {
@@ -173,7 +174,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 if a.is_error {
                     err = true;
                 } else {
-                    val = compute_cell(op_code, a.value, cell2.row << 16 | cell2.col, &mut String::new());
+                    (val, err1) = compute_cell(op_code, a.value, cell2.row << 16 | cell2.col, &mut String::new());
                 }
             }
             'Z' => {
@@ -207,14 +208,14 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             _ => {}
         }
-        (val, err, d)
+        (val,err, err1, d)
     };
 
     // ── 3) Finally, write back with one fresh mutable borrow ──
     {
         let c = &mut sheet.data[row][col];
         c.is_error = is_error;
-        if new_value == -1 {
+        if is_error2 == true {
             c.is_error = true;
         }
         else {
@@ -311,6 +312,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let curr_cell_row_col = curr_cell.col * 1000 + curr_cell.row;
     let mut ans = 0;
     let mut calc_error = false; 
+    let mut calc_error1 = false; 
     // Create a HashMap named avl_tree where the key is curr_cell_row_col and the value is indegree (0 by default)
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(curr_cell_row_col, 0);
@@ -357,10 +359,12 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
                 calc_error = true;
             } else {
-                ans = compute_cell(op_code, 
+                let (a,b) = compute_cell(op_code, 
                                  sheet.data[cell1.row as usize][cell1.col as usize].value, 
                                  value,
                                  status);
+                ans = a;
+                calc_error1 = b;
             } 
             sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
         },
@@ -419,10 +423,12 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
                sheet.data[cell2.row as usize][cell2.col as usize].is_error {
                 calc_error = true;
             } else {
-                ans = compute_cell(op_code,
+                let (a,b) = compute_cell(op_code,
                                  sheet.data[cell1.row as usize][cell1.col as usize].value,
                                  sheet.data[cell2.row as usize][cell2.col as usize].value,
                                  status);
+                ans = a;
+                calc_error1 = b;
             }
             sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
             sheet.data[cell2.row as usize][cell2.col as usize].dependencies.insert(curr_cell_row_col);
@@ -433,11 +439,10 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         }
     } 
     let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
-    cell.is_error = calc_error;  
-    if ans != -1 {
-    cell.value = ans;}
+    if calc_error == true || calc_error1 == true {
+        cell.is_error = true;}
     else {
-        cell.is_error = true;
+        cell.value  = ans;
     }
     if cell.op_code == 'Z' {
         *sleep_timer += ans;
