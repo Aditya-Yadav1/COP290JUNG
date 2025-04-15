@@ -56,6 +56,7 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
                 match trimmed.parse::<i32>() {
                     Ok(num) => Cell {
                         value: num,
+                        string: None,
                         is_error: false,
                         op_code: 'X',
                         cell1: CellInfo { row: -1, col: -1 },
@@ -65,6 +66,7 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
                     Err(_) => {
                         Cell {
                             value: 0,
+                            string : None,
                             is_error: true,
                             op_code: 'X',
                             cell1: CellInfo { row: -1, col: -1 },
