@@ -3,6 +3,7 @@ mod ui;
 mod sheet_functions;
 mod parser;
 mod calculate_functions;
+mod utils;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions::default();

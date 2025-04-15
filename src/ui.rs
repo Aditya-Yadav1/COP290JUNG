@@ -3,8 +3,10 @@
 use eframe::{egui, App, Frame};
 
 use crate::{parser, sheet_functions};
-
 use crate::sheet_functions::{Sheet, col_num_to_col_name};
+use crate::sheet_functions::CellInfo;
+use crate::utils::{convert_to_csv, open_csv};
+use std::collections::HashSet;
 
 #[derive(Debug, PartialEq)]
 enum Mode { Normal, Insert }
@@ -20,6 +22,10 @@ pub struct SpreadsheetApp {
     time: f32,
     editing_value: String,  // Store the currently edited value
     is_editing: bool,       // Track if we're actively editing
+    show_filename_input: bool,
+    filename: String,
+    open_filename: String,
+    show_open_filename_input: bool,
 }
 
 impl SpreadsheetApp {
@@ -35,6 +41,10 @@ impl SpreadsheetApp {
             time: 0.0,
             editing_value: String::new(),
             is_editing: false,
+            show_filename_input: false,
+            filename: String::from("sheet"),
+            open_filename: String::new(),
+            show_open_filename_input: false,
         }
     }
 }
@@ -72,6 +82,50 @@ impl App for SpreadsheetApp {
                     entered = Some(self.formula.clone());
                     self.formula.clear();
                 }
+                ui.separator();
+                if !self.show_filename_input && ui.button("Save").clicked() {
+                    self.show_filename_input = true;
+                }
+                if self.show_filename_input {
+                    let resp = ui.text_edit_singleline(&mut self.filename);
+                    if resp.lost_focus()  {
+                        self.show_filename_input = false;
+                    }
+                    if ui.button("Confirm Save").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        convert_to_csv(&self.sheet, &self.filename);
+                        self.status = "Saved".to_string();
+                        self.show_filename_input = false;
+                    }
+                }
+                ui.separator();
+                if !self.show_open_filename_input && ui.button("Open").clicked() {
+                    self.show_open_filename_input = true;
+                }
+                if self.show_open_filename_input {
+                    let resp = ui.text_edit_singleline(&mut self.open_filename);
+                    if resp.lost_focus()  {
+                        self.show_open_filename_input = false;
+                    }
+                    if ui.button("Open").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        self.show_open_filename_input = false;
+                        self.status = open_csv(&self.open_filename, &mut self.sheet);
+                    }
+                }
+                ui.separator();
+                if ui.button("Clear").clicked() {
+                    for row in &mut self.sheet.data {
+                        for cell in row {
+                            cell.value = 0;
+                            cell.is_error = false;
+                            cell.op_code = 'X';
+                            cell.cell1 = CellInfo { row: -1, col: -1 };
+                            cell.cell2 = CellInfo { row: -1, col: -1 };
+                            cell.dependencies = HashSet::new();
+                        }
+                    }
+                    self.status = "Cleared".to_string();
+                };
+                ui.separator();
             });
         });
 
