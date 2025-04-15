@@ -13,6 +13,7 @@ pub struct CellInfo {
 #[derive(Clone)]
 pub struct Cell {
     pub value: i32,
+    pub string: Option<String>,
     pub is_error: bool,
     pub op_code: char,
     pub cell1: CellInfo,
@@ -42,6 +43,7 @@ impl Sheet {
             for _ in 0..n {
                 row.push(Cell {
                     value: 0,
+                    string: None,
                     is_error: false,
                     op_code: 'X',
                     cell1: CellInfo { row: -1, col: -1 },
@@ -97,7 +99,12 @@ pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: 
         print!("{:>space$}", i + 1);
         for j in start_col..max_col_display {
             if sheet.data[i as usize][j as usize].is_error == false{
-            print!("{:>space$}", sheet.data[i as usize][j as usize].value);}
+                if sheet.data[i as usize][j as usize].string.is_some() {
+                    let s = sheet.data[i as usize][j as usize].string.as_ref().unwrap();
+                    print!("{:>space$}", s);
+                }
+                else {
+            print!("{:>space$}", sheet.data[i as usize][j as usize].value);}}
             else {
                 print!("{:>space$}", "Err");
             }
