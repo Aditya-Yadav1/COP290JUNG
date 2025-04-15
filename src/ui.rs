@@ -1,13 +1,24 @@
 // src/ui.rs
 
 use eframe::{egui, App, Frame};
-
 use crate::{parser, sheet_functions};
-
 use crate::sheet_functions::{Sheet, col_num_to_col_name};
+use crate::sheet_functions::CellInfo;
+use crate::utils::{convert_to_csv, open_csv};
+use std::collections::HashSet;
+use eframe::epaint::pos2;
+use crate::themes::{themes, Theme};  
 
 #[derive(Debug, PartialEq)]
 enum Mode { Normal, Insert }
+
+#[derive(Debug, PartialEq)]
+enum Menu{
+    Save,
+    Open,
+    Theme,
+    None,
+}
 
 pub struct SpreadsheetApp {
     sheet: Sheet,
@@ -20,6 +31,10 @@ pub struct SpreadsheetApp {
     time: f32,
     editing_value: String,  // Store the currently edited value
     is_editing: bool,       // Track if we're actively editing
+    show_menu: Menu,
+    save_filename: String,
+    open_filename: String,
+    theme: Theme,
 }
 
 impl SpreadsheetApp {
@@ -35,6 +50,10 @@ impl SpreadsheetApp {
             time: 0.0,
             editing_value: String::new(),
             is_editing: false,
+            show_menu: Menu::None,
+            save_filename: String::from("sheet"),
+            open_filename: String::new(),
+            theme: themes[0].clone(),
         }
     }
 }
@@ -47,15 +66,11 @@ impl Default for SpreadsheetApp {
 
 impl App for SpreadsheetApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) { 
-        ctx.set_visuals(egui::Visuals::dark());   // dark theme
-        
-        //colors
-        let header_bg = egui::Color32::from_rgb(45, 49, 58);
-        let cell_bg = egui::Color32::from_rgb(30, 34, 42);
-        let selected_cell_bg = egui::Color32::from_rgb(60, 70, 90);
-        let grid_line_color = egui::Color32::from_rgb(60, 64, 72);
-        let text_color = egui::Color32::from_rgb(220, 220, 220);
-        let header_text_color = egui::Color32::from_rgb(255, 255, 255);
+        if self.theme.is_light_theme {
+            ctx.set_visuals(egui::Visuals::light());   // light theme
+        } else {
+            ctx.set_visuals(egui::Visuals::dark());   // dark theme
+        }
         
         // defining visible rows and colums
         let visible_rows = 20;
@@ -63,8 +78,10 @@ impl App for SpreadsheetApp {
         
         // 1-> formula bar
         let mut entered = None;
+        
+
         egui::TopBottomPanel::top("formula_bar").show(ctx, |ui| {
-            ui.visuals_mut().override_text_color = Some(text_color);
+            ui.visuals_mut().override_text_color = Some(self.theme.text_color);
             ui.horizontal(|ui| {
                 ui.label("Formula:");
                 let resp = ui.text_edit_singleline(&mut self.formula);
@@ -72,6 +89,85 @@ impl App for SpreadsheetApp {
                     entered = Some(self.formula.clone());
                     self.formula.clear();
                 }
+            });
+            egui::CollapsingHeader::new("Menu")
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                if self.show_menu == Menu::None && ui.button("Save").clicked() {
+                    self.show_menu = Menu::Save;
+                }
+                if self.show_menu == Menu::Save {
+                    egui::Window::new("Save").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
+                    ui.label("Enter filename:");
+                    let resp = ui.text_edit_singleline(&mut self.save_filename);
+                    if resp.lost_focus()  {
+                        self.show_menu = Menu::None;
+                    }
+                    ui.horizontal(|ui|{
+                    if ui.button("Confirm Save").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        convert_to_csv(&self.sheet, &self.save_filename);
+                        self.status = "Saved".to_string();
+                        self.show_menu = Menu::None;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        self.show_menu = Menu::None;
+                    }});
+                    });
+
+                }
+
+                if self.show_menu == Menu::None && ui.button("Open").clicked() {
+                    self.show_menu = Menu::Open;
+                }
+                if self.show_menu == Menu::Open {
+                    egui::Window::new("Open").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
+                    ui.label("Enter filename:");    
+                    let resp = ui.text_edit_singleline(&mut self.open_filename);
+                    if resp.lost_focus()  {
+                        self.show_menu = Menu::None;
+                    }
+                    ui.horizontal(|ui|{
+                    if ui.button("Open").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        self.show_menu = Menu::None;
+                        self.status = open_csv(&self.open_filename, &mut self.sheet);
+                    }
+                    if ui.button("Cancel").clicked() {
+                        self.show_menu = Menu::None;
+                    }});
+                    });
+
+                }
+
+                if ui.button("Clear").clicked() {
+                    for row in &mut self.sheet.data {
+                        for cell in row {
+                            cell.value = 0;
+                            cell.is_error = false;
+                            cell.op_code = 'X';
+                            cell.cell1 = CellInfo { row: -1, col: -1 };
+                            cell.cell2 = CellInfo { row: -1, col: -1 };
+                            cell.dependencies = HashSet::new();
+                        }
+                    }
+                    self.status = "Cleared".to_string();
+                };
+                
+                if ui.button("Theme").clicked() {
+                    self.show_menu = Menu::Theme;
+                }
+                if self.show_menu == Menu::Theme {
+                    egui::Window::new("Theme").resizable(false).collapsible(false).show(ctx, |ui| {
+                        ui.label("Select theme:");
+                        for theme in &themes {
+                            if ui.button(theme.name).clicked() {
+                                self.theme = theme.clone();
+                                self.show_menu = Menu::None;
+                            }
+                        }
+                    });
+                }
+            })
             });
         });
 
@@ -103,18 +199,18 @@ impl App for SpreadsheetApp {
                     ui.painter().rect_filled(
                         corner_rect,
                         0.0,
-                        header_bg
+                        self.theme.header_bg
                     );
                     ui.painter().rect_stroke(
                         corner_rect,
                         0.0,
-                        egui::Stroke::new(1.0, grid_line_color)
+                        egui::Stroke::new(1.0, self.theme.grid_line_color)
                     );
                     ui.add_sized(
                         cell_size,
                         egui::Label::new(
                             egui::RichText::new("")
-                                .color(header_text_color)
+                                .color(self.theme.header_text_color)
                                 .text_style(egui::TextStyle::Heading)
                         )
                     );
@@ -125,12 +221,12 @@ impl App for SpreadsheetApp {
                         ui.painter().rect_filled(
                             header_rect,
                             0.0,
-                            header_bg
+                            self.theme.header_bg
                         );
                         ui.painter().rect_stroke(
                             header_rect,
                             0.0,
-                            egui::Stroke::new(1.0, grid_line_color)
+                            egui::Stroke::new(1.0, self.theme.grid_line_color)
                         );
                         
                         // Centring column header text
@@ -140,7 +236,7 @@ impl App for SpreadsheetApp {
                                 egui::Label::new(
                                     egui::RichText::new(col_num_to_col_name(c))
                                         .strong()
-                                        .color(header_text_color)
+                                        .color(self.theme.header_text_color)
                                         .text_style(egui::TextStyle::Heading)
                                 )
                             );
@@ -165,12 +261,12 @@ impl App for SpreadsheetApp {
                                 ui.painter().rect_filled(
                                     row_header_rect,
                                     0.0,
-                                    header_bg
+                                    self.theme.header_bg
                                 );
                                 ui.painter().rect_stroke(
                                     row_header_rect,
                                     0.0,
-                                    egui::Stroke::new(1.0, grid_line_color)
+                                    egui::Stroke::new(1.0, self.theme.grid_line_color)
                                 );
                                 
                                 // Center the row number
@@ -180,7 +276,7 @@ impl App for SpreadsheetApp {
                                         egui::Label::new(
                                             egui::RichText::new((r + 1).to_string())
                                                 .strong()
-                                                .color(header_text_color)
+                                                .color(self.theme.header_text_color)
                                                 .text_style(egui::TextStyle::Heading)
                                         )
                                     );
@@ -204,14 +300,14 @@ impl App for SpreadsheetApp {
                                     ui.painter().rect_filled(
                                         rect,
                                         0.0,
-                                        if is_sel { selected_cell_bg } else { cell_bg }
+                                        if is_sel { self.theme.selected_cell_bg } else { self.theme.cell_bg }
                                     );
                                     
                                     // Cell border
                                     ui.painter().rect_stroke(
                                         rect,
                                         0.0,
-                                        egui::Stroke::new(1.0, grid_line_color)
+                                        egui::Stroke::new(1.0, self.theme.grid_line_color)
                                     );
                                     
                                     if is_sel && self.mode == Mode::Insert {
@@ -227,7 +323,7 @@ impl App for SpreadsheetApp {
                                             egui::TextEdit::singleline(&mut self.editing_value)
                                                 .frame(false) // No additional frame
                                                 .desired_width(cell_size.x)
-                                                .text_color(text_color)
+                                                .text_color(self.theme.text_color)
                                                 .cursor_at_end(true)
                                         );
                                         
@@ -282,7 +378,7 @@ impl App for SpreadsheetApp {
                                             cell_size,
                                             egui::Label::new(
                                                 egui::RichText::new(display)
-                                                    .color(text_color)
+                                                    .color(self.theme.text_color)
                                             ).sense(egui::Sense::click()),
                                         );
                                         
@@ -329,7 +425,7 @@ impl App for SpreadsheetApp {
 
         // 3) Bottom panel: status & mode
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
-            ui.visuals_mut().override_text_color = Some(text_color);
+            ui.visuals_mut().override_text_color = Some(self.theme.text_color);
             ui.horizontal(|ui| {
                 ui.label(format!("Mode: {:?}", self.mode));
                 ui.separator();
