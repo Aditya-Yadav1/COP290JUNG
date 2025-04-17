@@ -410,21 +410,15 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
             // Use scoped blocks to manage borrows cleanly
-            let (copy_string, has_string) = {
-                let source_cell = &sheet.data[row1 as usize][col1 as usize];
-                (source_cell.string.clone(), source_cell.string.is_some())
-            };
-    
-            if !has_string {
+ 
                 let cell = CellInfo { row, col };
                 let cell1 = CellInfo { row: row1, col: col1 };
                 let cell2 = CellInfo { row: -1, col: -1 };
                 let op_code = '=';
     
                 sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
-            } else {
-                sheet.data[row as usize][col as usize].string = copy_string;
-            }
+
+
         } else {
             *status = String::from("Invalid cmd");
         }
