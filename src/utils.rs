@@ -5,7 +5,8 @@ use std::io::{BufReader, BufRead};
 use crate::sheet_functions::Cell;
 use crate::sheet_functions::CellInfo;
 use std::collections::HashSet;
-
+use std::fs;
+use crate::ui::Sheets;
 pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
     let save_file_name = format!("{}.csv", filename);
     let mut file = File::create(save_file_name).unwrap();
@@ -29,9 +30,8 @@ pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
 
 
 pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
-    let open_file_name = format!("{}.csv", filename);
     let mut status = String::from("CSV loaded!");
-    let file = match File::open(open_file_name) {
+    let file = match File::open(filename) {
         Ok(f) => f,
         Err(e) => {
             status = format!("Failed to open file: {}", e);
@@ -87,4 +87,27 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
     }
 
     status
+}
+
+
+pub fn save_sheet(sheet: &Sheet, filename: &str) {
+    let json = serde_json::to_string_pretty(sheet).unwrap();
+    let mut file = File::create(filename).unwrap();
+    file.write_all(json.as_bytes()).unwrap();
+}
+
+pub fn load_sheet(filename: &str) -> Sheet {
+    let data = fs::read_to_string(filename).unwrap();
+    serde_json::from_str(&data).unwrap()
+}
+
+pub fn save_all_sheets(sheets: &Vec<Sheets>, filename: &str) {
+    let mut file = File::create(filename).unwrap();
+    let json = serde_json::to_string_pretty(sheets).unwrap();
+    file.write_all(json.as_bytes()).unwrap();
+}
+
+pub fn load_all_sheets(filename: &str) -> Vec<Sheets> {
+    let data = fs::read_to_string(filename).unwrap();
+    serde_json::from_str(&data).unwrap()
 }
