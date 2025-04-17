@@ -157,29 +157,13 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let c = col_name_to_col_num(ref_col);
         let r = ref_row - 1;
         if is_valid_cell(r, c, *total_rows, *total_cols) {
-            {
-            let cell = &mut sheet.data[r as usize][c as usize];
-            cell.string = Some(value.to_string());
-            cell.value = 0; // Reset value as it's a string
-            cell.is_error = false;
-            cell.op_code = 'X';
-            cell.cell1 = CellInfo { row: -1, col: -1 };
-            cell.cell2 = CellInfo { row: -1, col: -1 };}
-            // Clear existing constraints} 
-            remove_dependency(&CellInfo { row: r, col: c }, sheet);
-            // Set cell metadata
-            // Trigger recalculation of dependent cells 
-            let mut avl_tree: HashMap<i32, i32> = HashMap::new();
-            avl_tree.insert(c * 1000 + r, 0);
-            add_to_tree(&mut avl_tree, CellInfo { row: r, col: c }, sheet);
-            let sorted = topological_sort(&mut avl_tree, &sheet);
-            for i in sorted {
-                let row = i % 1000;
-                let col = i / 1000;
-                recalculate(sheet, row as usize, col as usize, &mut 
-                    0);
-            }
-            *status = String::from("ok");
+            let cell = CellInfo { row: r, col: c };
+            let cell1 = CellInfo { row: -1, col: -1 };
+            let cell2 = CellInfo { row: -1, col: -1 };
+            let op_code = 'X';
+            // Temporarily store the string in the cell to pass to add_constraints
+            sheet.data[r as usize][c as usize].string = Some(value.to_string());
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
         } else {
             *status = String::from("Invalid cmd");
         }

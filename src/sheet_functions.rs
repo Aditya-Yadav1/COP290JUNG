@@ -236,6 +236,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             else{
                 c.value = new_value;
+                c.string = None;
             }
         }
     }
@@ -340,6 +341,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     match op_code {
         'X' => {
             ans = sheet.data[curr_cell.row as usize][curr_cell.col as usize].value;
+            ans_string = sheet.data[curr_cell.row as usize][curr_cell.col as usize].string.clone();
             remove_dependency(&curr_cell, sheet);
             let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
             cell.op_code = op_code;
@@ -467,7 +469,9 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             if ans_string.is_some(){
                 cell.string = ans_string;
             }
+            else{
             cell.value  = ans;
+            cell.string = None;}
         }
         if cell.op_code == 'Z' {
             *sleep_timer += ans;
