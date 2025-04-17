@@ -144,17 +144,18 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
         let c = &mut sheet.data[row][col];
         (c.op_code, c.cell1.clone(), c.cell2.clone())
     }; 
-    if op_code == 'X' {
+    if op_code == 'X' || op_code == '^' {
         return;
     }
 
     // ── 2) Compute the new value, error flag, and any sleep delta using *only* immutable borrows ──
-    let (new_value, is_error,is_error2, delta) = {
+    let (new_value, string_value, is_error, is_error2, delta) = {
         // Immutable borrow of the whole sheet
         let s = &*sheet;
 
         let mut err = false;
         let mut val = 0;
+        let mut strval = String::new();
         let mut d = 0;
         let mut err1: bool = false;
 
@@ -164,7 +165,11 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 if ref_cell.is_error {
                     err = true;
                 } else {
-                    val = ref_cell.value;
+                    if ref_cell.string.is_some(){
+                        strval = ref_cell.string.as_ref().unwrap().clone();
+                    }else{
+                        val = ref_cell.value; 
+                    } 
                 }
             }
             '+' | '-' | '*' | '/' => {
@@ -215,7 +220,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             _ => {}
         }
-        (val,err, err1, d)
+        (val,strval,err, err1, d)
     };
 
     // ── 3) Finally, write back with one fresh mutable borrow ──
@@ -226,7 +231,13 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             c.is_error = true;
         }
         else {
-        c.value    = new_value;}
+            if op_code == '=' && string_value != "" {
+                c.string = Some(string_value.clone());
+            } else{
+                c.value  = new_value;
+                c.string = None;
+            }
+        }
     }
     *sleep_timer += delta;
 }
@@ -334,6 +345,14 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell1 = CellInfo { row: -1, col: -1 };
             cell.cell2 = CellInfo { row: -1, col: -1 };
         },
+        '^' => {
+            // string case
+            remove_dependency(&curr_cell, sheet); 
+            let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
+            cell.op_code = op_code;
+            cell.cell1 = CellInfo { row: -1, col: -1 };
+            cell.cell2 = CellInfo { row: -1, col: -1 };
+        },
         '=' => {
             if check_cycle(&avl_tree, &cell1, &temp) {
                 *status = String::from("circular error"); 
@@ -361,7 +380,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
             cell.cell1 = cell1.clone();
             cell.cell2 = cell2.clone();
-            cell.op_code = op_code; 
+            cell.op_code = op_code;
             let value = (cell2.row as i32) << 16 | (cell2.col as i32 & 0xFFFF); 
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
                 calc_error = true;
@@ -448,8 +467,9 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
     if calc_error == true || calc_error1 == true {
         cell.is_error = true;}
-    else {
+    else if cell.op_code != '^'{
         cell.value  = ans;
+        cell.string = None;
     }
     if cell.op_code == 'Z' {
         *sleep_timer += ans;
