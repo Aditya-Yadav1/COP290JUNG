@@ -7,6 +7,9 @@ use crate::sheet_functions::CellInfo;
 use std::collections::HashSet;
 use std::fs;
 use crate::ui::Sheets;
+use flate2::Compression;
+use flate2::write::GzEncoder;
+use flate2::read::GzDecoder;
 pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
     let save_file_name = format!("{}.csv", filename);
     let mut file = File::create(save_file_name).unwrap();
@@ -103,11 +106,12 @@ pub fn load_sheet(filename: &str) -> Sheet {
 
 pub fn save_all_sheets(sheets: &Vec<Sheets>, filename: &str) {
     let mut file = File::create(filename).unwrap();
-    let json = serde_json::to_string_pretty(sheets).unwrap();
-    file.write_all(json.as_bytes()).unwrap();
+    let encoder = GzEncoder::new(file, Compression::default());
+    serde_json::to_writer_pretty(encoder, sheets).unwrap();   
 }
 
 pub fn load_all_sheets(filename: &str) -> Vec<Sheets> {
-    let data = fs::read_to_string(filename).unwrap();
-    serde_json::from_str(&data).unwrap()
+    let file = File::open(filename).unwrap();
+    let decoder = GzDecoder::new(file);
+    serde_json::from_reader(decoder).unwrap()
 }
