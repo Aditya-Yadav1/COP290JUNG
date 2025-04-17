@@ -323,7 +323,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     // Create a HashMap named avl_tree where the key is curr_cell_row_col and the value is indegree (0 by default)
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(curr_cell_row_col, 0);
-
+    let temp = CellInfo{ row: -1, col: -1};
     add_to_tree(&mut avl_tree, curr_cell.clone(), sheet);   
     match op_code {
         'X' => {
@@ -335,7 +335,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell2 = CellInfo { row: -1, col: -1 };
         },
         '=' => {
-            if check_cycle(&avl_tree, &cell1, &cell2) {
+            if check_cycle(&avl_tree, &cell1, &temp) {
                 *status = String::from("circular error"); 
                 return;
             }
@@ -353,7 +353,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
         },
         'p' | 's' | 'u' | 'd' | 'b' | 'Z' => {
-            if check_cycle(&avl_tree, &cell1, &cell2) {
+            if check_cycle(&avl_tree, &cell1, &temp) {
                 *status = String::from("circular error"); 
                 return;
             }
