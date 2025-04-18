@@ -1,9 +1,7 @@
-// src/ui.rs
-
 use eframe::{egui, App, Frame};
 use serde::{Deserialize, Serialize};
 use crate::{parser, sheet_functions};
-use crate::sheet_functions::{Sheet, col_num_to_col_name};
+use crate::sheet_functions::{Sheet, col_num_to_col_name, recalculate, Cell};
 use crate::sheet_functions::CellInfo;
 use crate::utils::{convert_to_csv, open_csv, save_sheet, load_sheet, save_all_sheets, load_all_sheets};
 use std::collections::HashSet;
@@ -14,7 +12,7 @@ use crate::themes::{themes, Theme};
 enum Mode { Normal, Insert }
 
 #[derive(Debug, PartialEq)]
-enum Menu{
+enum Menu {
     Save,
     Open,
     Theme,
@@ -23,11 +21,35 @@ enum Menu{
     None,
 }
 
-#[derive(Deserialize,Serialize)]
-pub struct Sheets{
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Sheets {
     pub sheet: Sheet,
-    pub name : String,
-}   
+    pub name: String,
+}
+
+#[derive(Clone)]
+enum Action {
+    CellEdit {
+        sheet_index: usize,
+        row: usize,
+        col: usize,
+        old_cell: Cell,
+        new_cell: Cell,
+        command: String, // Store the command for redo/undo
+    },
+    NewSheet {
+        sheet: Sheets,
+        index: usize,
+    },
+    DeleteSheet {
+        sheet: Sheets,
+        index: usize,
+    },
+    ClearSheet {
+        sheet_index: usize,
+        old_data: Vec<Vec<Cell>>,
+    },
+}
 
 pub struct SpreadsheetApp {
     sheets: Vec<Sheets>,
@@ -39,8 +61,9 @@ pub struct SpreadsheetApp {
     row_start: i32,
     col_start: i32,
     time: f32,
-    editing_value: String,  // Store the currently edited value
-    is_editing: bool,       // Track if we're actively editing
+    timer: i32,
+    editing_value: String,
+    is_editing: bool,
     show_menu: Menu,
     save_filename: String,
     open_filename: String,
@@ -48,15 +71,14 @@ pub struct SpreadsheetApp {
     new_sheet_rows: String,
     new_sheet_cols: String,
     new_sheet_name: String,
+    undo_stack: Vec<Action>,
+    redo_stack: Vec<Action>,
 }
-
-
-
 
 impl SpreadsheetApp {
     pub fn new(mut sheets: Vec<Sheets>) -> Self {
         Self {
-            sheets: sheets,
+            sheets,
             current_sheet_index: 0,
             formula: String::new(),
             status: "ok".into(),
@@ -65,6 +87,7 @@ impl SpreadsheetApp {
             row_start: 0,
             col_start: 0,
             time: 0.0,
+            timer: 0,
             editing_value: String::new(),
             is_editing: false,
             show_menu: Menu::None,
@@ -72,8 +95,159 @@ impl SpreadsheetApp {
             open_filename: String::new(),
             theme: themes[0].clone(),
             new_sheet_rows: String::new(),
-                new_sheet_cols: String::new(),
+            new_sheet_cols: String::new(),
             new_sheet_name: String::new(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+        }
+    }
+
+
+    fn undo(&mut self) {
+        if let Some(action) = self.undo_stack.pop() {
+            match action {
+                Action::CellEdit {
+                    sheet_index,
+                    row,
+                    col,
+                    old_cell,
+                    new_cell,
+                    command: _,
+                } => {
+                    // Revert to old_cell and reprocess the original command that produced old_cell
+                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
+                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
+                    let col_name = col_num_to_col_name(col as i32);
+                    let row_str = (row + 1).to_string();
+                    let cmd = if old_cell.string.is_some() {
+                        format!("{}{}={}", col_name, row_str, old_cell.string.as_ref().unwrap())
+                    } else if old_cell.is_error {
+                        format!("{}{}=Err", col_name, row_str)
+                    } else {
+                        format!("{}{}={}", col_name, row_str, old_cell.value)
+                    };
+                    parser::parse_command(
+                        &cmd,
+                        &mut self.row_start,
+                        &mut self.col_start,
+                        &mut self.time,
+                        &mut self.status,
+                        &sheet_rows,
+                        &sheet_cols,
+                        &mut self.sheets[sheet_index].sheet,
+                    );
+                    let new_cell1 =  self.sheets[sheet_index].sheet.data[row][col].clone();
+                    self.redo_stack.push(Action::CellEdit {
+                        sheet_index,
+                        row,
+                        col,
+                        old_cell: new_cell,
+                        new_cell: new_cell1.clone(),
+                        command: cmd,
+                    });
+                    self.status = "Undone cell edit".to_string();
+                }
+                Action::NewSheet { sheet, index } => {
+                    let removed_sheet = self.sheets.remove(index);
+                    self.current_sheet_index = self.current_sheet_index.min(self.sheets.len().saturating_sub(1));
+                    self.redo_stack.push(Action::NewSheet {
+                        sheet: removed_sheet,
+                        index,
+                    });
+                    self.status = "Undone new sheet".to_string();
+                }
+                Action::DeleteSheet { sheet, index } => {
+                    self.sheets.insert(index, sheet.clone());
+                    self.current_sheet_index = index;
+                    self.redo_stack.push(Action::DeleteSheet { sheet, index });
+                    self.status = "Undone delete sheet".to_string();
+                }
+                Action::ClearSheet { sheet_index, old_data } => {
+                    let new_data = self.sheets[sheet_index].sheet.data.clone();
+                    self.sheets[sheet_index].sheet.data = old_data;
+                    self.redo_stack.push(Action::ClearSheet {
+                        sheet_index,
+                        old_data: new_data,
+                    });
+                    self.status = "Undone clear sheet".to_string();
+                }
+            }
+        } else {
+            self.status = "Nothing to undo".to_string();
+        }
+    }
+
+    fn redo(&mut self) {
+        if let Some(action) = self.redo_stack.pop() {
+            match action {
+                Action::CellEdit {
+                    sheet_index,
+                    row,
+                    col,
+                    old_cell,
+                    new_cell,
+                    command,
+                } => {
+                    // Apply new_cell by reprocessing the command
+                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
+                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
+                    let col_name = col_num_to_col_name(col as i32);
+                    let row_str = (row + 1).to_string();
+                    let cmd = if old_cell.string.is_some() {
+                        format!("{}{}={}", col_name, row_str, old_cell.string.as_ref().unwrap())
+                    } else if old_cell.is_error {
+                        format!("{}{}=Err", col_name, row_str)
+                    } else {
+                        format!("{}{}={}", col_name, row_str, old_cell.value)
+                    };
+                    parser::parse_command(
+                        &cmd,
+                        &mut self.row_start,
+                        &mut self.col_start,
+                        &mut self.time,
+                        &mut self.status,
+                        &sheet_rows,
+                        &sheet_cols,
+                        &mut self.sheets[sheet_index].sheet,
+                    );
+                    let new_cell1 =  self.sheets[sheet_index].sheet.data[row][col].clone();
+                    self.undo_stack.push(Action::CellEdit {
+                        sheet_index,
+                        row,
+                        col,
+                        old_cell: new_cell,
+                        new_cell: new_cell1.clone(),
+                        command: cmd,
+                    });
+                    self.status = "Redone cell edit".to_string();
+                }
+                Action::NewSheet { sheet, index } => {
+                    self.sheets.insert(index, sheet.clone());
+                    self.current_sheet_index = index;
+                    self.undo_stack.push(Action::NewSheet { sheet, index });
+                    self.status = "Redone new sheet".to_string();
+                }
+                Action::DeleteSheet { sheet, index } => {
+                    let removed_sheet = self.sheets.remove(index);
+                    self.current_sheet_index = self.current_sheet_index.min(self.sheets.len().saturating_sub(1));
+                    self.undo_stack.push(Action::DeleteSheet {
+                        sheet: removed_sheet,
+                        index,
+                    });
+                    self.status = "Redone delete sheet".to_string();
+                }
+                Action::ClearSheet { sheet_index, old_data } => {
+                    let new_data = self.sheets[sheet_index].sheet.data.clone();
+                    self.sheets[sheet_index].sheet.data = old_data;
+                    self.undo_stack.push(Action::ClearSheet {
+                        sheet_index,
+                        old_data: new_data,
+                    });
+                    self.status = "Redone clear sheet".to_string();
+                }
+            }
+        } else {
+            self.status = "Nothing to redo".to_string();
         }
     }
 }
@@ -81,7 +255,10 @@ impl SpreadsheetApp {
 impl Default for SpreadsheetApp {
     fn default() -> Self {
         let sheet = Sheet::new(20, 10);
-        let sheets = vec![Sheets{sheet:sheet.clone(), name:String::from("Sheet 1")}];
+        let sheets = vec![Sheets {
+            sheet: sheet.clone(),
+            name: String::from("Sheet 1"),
+        }];
         Self::new(sheets)
     }
 }
@@ -89,18 +266,15 @@ impl Default for SpreadsheetApp {
 impl App for SpreadsheetApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) { 
         if self.theme.is_light_theme {
-            ctx.set_visuals(egui::Visuals::light());   // light theme
+            ctx.set_visuals(egui::Visuals::light());
         } else {
-            ctx.set_visuals(egui::Visuals::dark());   // dark theme
+            ctx.set_visuals(egui::Visuals::dark());
         }
         
-        // defining visible rows and colums
         let visible_rows = 20;
         let visible_cols = 15;
         
-        // 1-> formula bar
         let mut entered = None;
-        
 
         egui::TopBottomPanel::top("formula_bar").show(ctx, |ui| {
             ui.visuals_mut().override_text_color = Some(self.theme.text_color);
@@ -113,138 +287,146 @@ impl App for SpreadsheetApp {
                 }
             });
             egui::CollapsingHeader::new("Menu")
-            .default_open(true)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                if self.show_menu == Menu::None && ui.button("Save").clicked() {
-                    self.show_menu = Menu::Save;
-                }
-                if self.show_menu == Menu::Save {
-                    egui::Window::new("Save").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
-                    ui.label("Enter filename:");
-                    let resp = ui.text_edit_singleline(&mut self.save_filename);
-                    if resp.lost_focus()  {
-                        self.show_menu = Menu::None;
-                    }
-                    ui.horizontal(|ui|{
-                    if ui.button("Save File").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        if self.save_filename.is_empty() {
-                            self.status = "Please enter a filename".to_string();
-                        }else{
-                            let save_file_name = format!("{}.290", self.save_filename);
-                            save_all_sheets(&self.sheets, &save_file_name);
-                            self.status = "Saved".to_string();
-                            self.show_menu = Menu::None;
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        if self.show_menu == Menu::None && ui.button("Save").clicked() {
+                            self.show_menu = Menu::Save;
                         }
-                    }
-                    if ui.button("Save to CSV").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        if self.save_filename.is_empty() {
-                            self.status = "Please enter a filename".to_string();
-                        }else{
-                            convert_to_csv(&self.sheets[self.current_sheet_index].sheet, &self.save_filename);
-                            self.status = "Saved".to_string();
-                            self.show_menu = Menu::None;
+                        if self.show_menu == Menu::Save {
+                            egui::Window::new("Save").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
+                                ui.label("Enter filename:");
+                                let resp = ui.text_edit_singleline(&mut self.save_filename);
+                                if resp.lost_focus() {
+                                    self.show_menu = Menu::None;
+                                }
+                                ui.horizontal(|ui| {
+                                    if ui.button("Save File").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                        if self.save_filename.is_empty() {
+                                            self.status = "Please enter a filename".to_string();
+                                        } else {
+                                            let save_file_name = format!("{}.290", self.save_filename);
+                                            save_all_sheets(&self.sheets, &save_file_name);
+                                            self.status = "Saved".to_string();
+                                            self.show_menu = Menu::None;
+                                        }
+                                    }
+                                    if ui.button("Save to CSV").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                        if self.save_filename.is_empty() {
+                                            self.status = "Please enter a filename".to_string();
+                                        } else {
+                                            convert_to_csv(&self.sheets[self.current_sheet_index].sheet, &self.save_filename);
+                                            self.status = "Saved".to_string();
+                                            self.show_menu = Menu::None;
+                                        }
+                                    }
+                                    if ui.button("Cancel").clicked() {
+                                        self.show_menu = Menu::None;
+                                    }
+                                });
+                            });
                         }
-                    }
-                    if ui.button("Cancel").clicked() {
-                        self.show_menu = Menu::None;
-                    }});
-                    });
 
-                }
+                        if self.show_menu == Menu::None && ui.button("Open").clicked() {
+                            self.show_menu = Menu::Open;
+                        }
+                        if self.show_menu == Menu::Open {
+                            egui::Window::new("Open").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
+                                ui.label("Enter filename:");    
+                                let resp = ui.text_edit_singleline(&mut self.open_filename);
+                                if resp.lost_focus() {
+                                    self.show_menu = Menu::None;
+                                }
+                                ui.horizontal(|ui| {
+                                    if ui.button("Open").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                        if self.open_filename.is_empty() {
+                                            self.status = "Please enter a filename".to_string();
+                                        } else if self.open_filename.ends_with(".csv") {
+                                            self.show_menu = Menu::None;    
+                                            self.status = open_csv(&self.open_filename, &mut self.sheets[self.current_sheet_index].sheet);
+                                        } else if self.open_filename.ends_with(".290") {
+                                            self.show_menu = Menu::None;
+                                            self.sheets = load_all_sheets(&self.open_filename);
+                                            self.current_sheet_index = 0;
+                                            self.status = "Loaded".to_string();
+                                        } else {
+                                            self.status = "Please enter a valid filename".to_string();
+                                        }
+                                    }
+                                    if ui.button("Cancel").clicked() {
+                                        self.show_menu = Menu::None;
+                                    }
+                                });
+                            });
+                        }
 
-                if self.show_menu == Menu::None && ui.button("Open").clicked() {
-                    self.show_menu = Menu::Open;
-                }
-                if self.show_menu == Menu::Open {
-                    egui::Window::new("Open").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
-                    ui.label("Enter filename:");    
-                    let resp = ui.text_edit_singleline(&mut self.open_filename);
-                    if resp.lost_focus()  {
-                        self.show_menu = Menu::None;
-                    }
-                    ui.horizontal(|ui|{
-                    if ui.button("Open").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        if self.open_filename.is_empty() {
-                            self.status = "Please enter a filename".to_string();
-                        }else if self.open_filename.ends_with(".csv") {
-                            self.show_menu = Menu::None;    
-                            self.status = open_csv(&self.open_filename, &mut self.sheets[self.current_sheet_index].sheet);
-                        }
-                        else if self.open_filename.ends_with(".290") {
-                            self.show_menu = Menu::None;
-                            self.sheets = load_all_sheets(&self.open_filename);
-                            self.current_sheet_index = 0;
-                            self.status = "Loaded".to_string();
-                        }
-                        else {
-                            self.status = "Please enter a valid filename".to_string();
-                        }
-                    }
-                    if ui.button("Cancel").clicked() {
-                        self.show_menu = Menu::None;
-                    }});
-                    });
-
-                }
-
-                if ui.button("Clear").clicked() {
-                    for row in &mut self.sheets[self.current_sheet_index].sheet.data {
-                        for cell in row {
-                            cell.value = 0;
-                            cell.string = None;
-                            cell.is_error = false;
-                            cell.op_code = 'X';
-                            cell.cell1 = CellInfo { row: -1, col: -1 };
-                            cell.cell2 = CellInfo { row: -1, col: -1 };
-                            cell.dependencies = HashSet::new();
-                        }
-                    }
-                    self.status = "Cleared".to_string();
-                };
-                
-                if ui.button("Theme").clicked() {
-                    self.show_menu = Menu::Theme;
-                }
-                if self.show_menu == Menu::Theme {
-                    egui::Window::new("Theme").resizable(false).collapsible(false).show(ctx, |ui| {
-                        ui.label("Select theme:");
-                        for theme in &themes {
-                            if ui.button(theme.name).clicked() {
-                                self.theme = theme.clone();
-                                self.show_menu = Menu::None;
+                        if ui.button("Clear").clicked() {
+                            let old_data = self.sheets[self.current_sheet_index].sheet.data.clone();
+                            for row in &mut self.sheets[self.current_sheet_index].sheet.data {
+                                for cell in row {
+                                    cell.value = 0;
+                                    cell.string = None;
+                                    cell.is_error = false;
+                                    cell.op_code = 'X';
+                                    cell.cell1 = CellInfo { row: -1, col: -1 };
+                                    cell.cell2 = CellInfo { row: -1, col: -1 };
+                                    cell.dependencies = HashSet::new();
+                                }
                             }
+                            self.undo_stack.push(Action::ClearSheet {
+                                sheet_index: self.current_sheet_index,
+                                old_data,
+                            });
+                            self.redo_stack.clear();
+                            self.status = "Cleared".to_string();
+                        }
+
+                        if ui.button("Undo").clicked() {
+                            self.undo();
+                            ctx.request_repaint();
+                        }
+
+                        if ui.button("Redo").clicked() {
+                            self.redo();
+                            ctx.request_repaint();
+                        }
+
+                        if ui.button("Theme").clicked() {
+                            self.show_menu = Menu::Theme;
+                        }
+                        if self.show_menu == Menu::Theme {
+                            egui::Window::new("Theme").resizable(false).collapsible(false).show(ctx, |ui| {
+                                ui.label("Select theme:");
+                                for theme in &themes {
+                                    if ui.button(theme.name).clicked() {
+                                        self.theme = theme.clone();
+                                        self.show_menu = Menu::None;
+                                    }
+                                }
+                            });
                         }
                     });
-                }
-            })
-            });
+                });
         });
 
-        // 2) Central panel with sticky headers
         egui::CentralPanel::default().show(ctx, |ui| {
             let cell_size = egui::vec2(120.0, 30.0);
             
-            // before redering checking mouse scroll
             let scroll_delta = ui.input(|i| i.smooth_scroll_delta);
             if scroll_delta.y != 0.0 {
-                // vectical scroll with mouse
                 let scroll_rows = (scroll_delta.y / 30.0).round() as i32;
                 self.row_start = (self.row_start - scroll_rows).max(0).min(self.sheets[self.current_sheet_index].sheet.rows - 1);
             }
             if scroll_delta.x != 0.0 {
-                // horizontal scroll with mouse  (Shift+scroll)
                 let scroll_cols = (scroll_delta.x / 30.0).round() as i32;
                 self.col_start = (self.col_start - scroll_cols).max(0).min(self.sheets[self.current_sheet_index].sheet.cols - 1);
             }
             
-            // creating grid with headers
             egui::Grid::new("header_grid")
                 .min_col_width(cell_size.x)
                 .min_row_height(cell_size.y)
-                .spacing([0.0, 0.0]) // No spacing for perfect alignment
+                .spacing([0.0, 0.0])
                 .show(ui, |ui| {
-                    // Corner cell
                     let corner_rect = ui.available_rect_before_wrap();
                     ui.painter().rect_filled(
                         corner_rect,
@@ -265,7 +447,6 @@ impl App for SpreadsheetApp {
                         )
                     );
                     
-                    // Column headers with exact same width as cells below
                     for c in self.col_start..(self.col_start + visible_cols).min(self.sheets[self.current_sheet_index].sheet.cols) {
                         let header_rect = ui.available_rect_before_wrap();
                         ui.painter().rect_filled(
@@ -279,7 +460,6 @@ impl App for SpreadsheetApp {
                             egui::Stroke::new(1.0, self.theme.grid_line_color)
                         );
                         
-                        // Centring column header text
                         ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
                             ui.add_sized(
                                 cell_size,
@@ -295,18 +475,15 @@ impl App for SpreadsheetApp {
                     ui.end_row();
                 });
             
-            // rendering scrollable grid below headers
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     egui::Grid::new("sheet_grid")
                         .min_col_width(cell_size.x)
                         .min_row_height(cell_size.y)
-                        .spacing([0.0, 0.0]) // No spacing for perfect alignment
+                        .spacing([0.0, 0.0])
                         .show(ui, |ui| {
-                            // Data rows
                             for r in self.row_start..(self.row_start + visible_rows).min(self.sheets[self.current_sheet_index].sheet.rows) {
-                                // Row headers with proper styling
                                 let row_header_rect = ui.available_rect_before_wrap();
                                 ui.painter().rect_filled(
                                     row_header_rect,
@@ -319,7 +496,6 @@ impl App for SpreadsheetApp {
                                     egui::Stroke::new(1.0, self.theme.grid_line_color)
                                 );
                                 
-                                // Center the row number
                                 ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
                                     ui.add_sized(
                                         cell_size,
@@ -332,7 +508,6 @@ impl App for SpreadsheetApp {
                                     );
                                 });
                                 
-                                // Data cells
                                 for c in self.col_start..(self.col_start + visible_cols).min(self.sheets[self.current_sheet_index].sheet.cols) {
                                     let cell = &mut self.sheets[self.current_sheet_index].sheet.data[r as usize][c as usize];
                                     let display = if cell.string.is_some() {
@@ -345,17 +520,14 @@ impl App for SpreadsheetApp {
                                     
                                     let is_sel = self.selected_cell == Some((r as usize, c as usize));
                                     
-                                    // Draw cell background with border for grid-like appearance
                                     let rect = ui.available_rect_before_wrap();
                                     
-                                    // Cell background
                                     ui.painter().rect_filled(
                                         rect,
                                         0.0,
                                         if is_sel { self.theme.selected_cell_bg } else { self.theme.cell_bg }
                                     );
                                     
-                                    // Cell border
                                     ui.painter().rect_stroke(
                                         rect,
                                         0.0,
@@ -363,30 +535,26 @@ impl App for SpreadsheetApp {
                                     );
                                     
                                     if is_sel && self.mode == Mode::Insert {
-                                        // Initialize editing value if we just started editing
                                         if !self.is_editing {
                                             self.editing_value = display.clone();
                                             self.is_editing = true;
                                         }
                                         
-                                        // Editable cell
                                         let edit = ui.add_sized(
                                             cell_size,
                                             egui::TextEdit::singleline(&mut self.editing_value)
-                                                .frame(false) // No additional frame
+                                                .frame(false)
                                                 .desired_width(cell_size.x)
                                                 .text_color(self.theme.text_color)
                                                 .cursor_at_end(true)
                                         );
                                         
-                                        // Handle Enter key to commit changes
                                         if edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                                            // 1) build command "A2=value"
                                             let col_name = col_num_to_col_name(c);
                                             let row_str = (r + 1).to_string();
                                             let cmd = format!("{}{}={}", col_name, row_str, self.editing_value);
                                             
-                                            // 2) call parser to recalc
+                                            let old_cell = self.sheets[self.current_sheet_index].sheet.data[r as usize][c as usize].clone();
                                             let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
                                             let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
                                             parser::parse_command(
@@ -400,32 +568,36 @@ impl App for SpreadsheetApp {
                                                 &mut self.sheets[self.current_sheet_index].sheet,
                                             );
                                             
-                                            // 3) reset editing state
-                                            // self.mode = Mode::Normal;
+                                            let new_cell = self.sheets[self.current_sheet_index].sheet.data[r as usize][c as usize].clone();
+                                            self.undo_stack.push(Action::CellEdit {
+                                                sheet_index: self.current_sheet_index,
+                                                row: r as usize,
+                                                col: c as usize,
+                                                old_cell,
+                                                new_cell,
+                                                command: cmd,
+                                            });
+                                            self.redo_stack.clear();
                                             self.is_editing = false;
                                             self.editing_value.clear();
                                         }
                                         
-                                        // use esc to go to normal mode
                                         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
                                             self.mode = Mode::Normal;
                                             self.is_editing = false;
                                             self.editing_value.clear();
                                         }
                                         
-                                        // if outside clicks current cell -> cancel editing
                                         if ui.input(|i| i.pointer.any_click()) {
                                             let pointer_pos = ui.input(|i| i.pointer.interact_pos());
                                             if let Some(pos) = pointer_pos {
                                                 if !rect.contains(pos) { 
-                                                    // self.mode = Mode::Normal;
                                                     self.is_editing = false;
                                                     self.editing_value.clear();
                                                 }
                                             }
                                         }
                                     } else {
-                                        // Non-editable cell with click detection
                                         let response = ui.add_sized(
                                             cell_size,
                                             egui::Label::new(
@@ -435,7 +607,6 @@ impl App for SpreadsheetApp {
                                         );
                                         
                                         if response.clicked() {
-                                            // If we were editing another cell, discard those changes
                                             if self.is_editing {
                                                 self.is_editing = false;
                                                 self.editing_value.clear();
@@ -443,7 +614,6 @@ impl App for SpreadsheetApp {
                                             
                                             self.selected_cell = Some((r as usize, c as usize));
                                             
-                                            // Double click enter edit mode
                                             if response.clicked_by(egui::PointerButton::Primary) && 
                                                response.double_clicked() {
                                                 self.mode = Mode::Insert;
@@ -456,7 +626,6 @@ impl App for SpreadsheetApp {
                         });
                 });
             
-            // Add horizontal scrollbar for better UX
             ui.horizontal(|ui| {
                 if ui.button("◀").clicked() {
                     self.col_start = (self.col_start - 1).max(0);
@@ -501,37 +670,46 @@ impl App for SpreadsheetApp {
                         ui.label("Enter sheet name:");
                         let name = ui.text_edit_singleline(&mut self.new_sheet_name);
                         ui.horizontal(|ui| {
-                        if ui.button("Create").clicked() {
-                            if self.new_sheet_rows.is_empty() || self.new_sheet_cols.is_empty() {
-                                self.status = String::from("Please enter number of rows and columns");
-                            }
-                            else {
-                                match (self.new_sheet_rows.parse::<i32>(), self.new_sheet_cols.parse::<i32>()) {
-                                    (Ok(rows), Ok(cols)) => {
-                                        if rows <= 0 || cols <= 0 || rows >1000 || cols > 18278 {
-                                            self.status = String::from("number of rows and columns not in valid range");
-                                        } else {
-                                            if self.new_sheet_name.is_empty() {
-                                                self.new_sheet_name = format!("Sheet {}", self.sheets.len() + 1);
+                            if ui.button("Create").clicked() {
+                                if self.new_sheet_rows.is_empty() || self.new_sheet_cols.is_empty() {
+                                    self.status = String::from("Please enter number of rows and columns");
+                                } else {
+                                    match (self.new_sheet_rows.parse::<i32>(), self.new_sheet_cols.parse::<i32>()) {
+                                        (Ok(rows), Ok(cols)) => {
+                                            if rows <= 0 || cols <= 0 || rows > 1000 || cols > 18278 {
+                                                self.status = String::from("number of rows and columns not in valid range");
+                                            } else {
+                                                if self.new_sheet_name.is_empty() {
+                                                    self.new_sheet_name = format!("Sheet {}", self.sheets.len() + 1);
+                                                }
+                                                let new_sheet = Sheet::new(rows, cols);
+                                                let sheet_struct = Sheets {
+                                                    sheet: new_sheet.clone(),
+                                                    name: self.new_sheet_name.clone(),
+                                                };
+                                                self.sheets.push(sheet_struct.clone());
+                                                let new_index = self.sheets.len() - 1;
+                                                self.current_sheet_index = new_index;
+                                                self.undo_stack.push(Action::NewSheet {
+                                                    sheet: sheet_struct,
+                                                    index: new_index,
+                                                });
+                                                self.redo_stack.clear();
+                                                self.show_menu = Menu::None;
+                                                self.status = String::from("Sheet created successfully");
+                                                self.new_sheet_name = String::new();
                                             }
-                                            let new_sheet = Sheet::new(rows, cols);
-                                            self.sheets.push(Sheets{sheet:new_sheet.clone(), name:self.new_sheet_name.clone()});
-                                            self.current_sheet_index = self.sheets.len() - 1;
-                                            self.show_menu = Menu::None;
-                                            self.status = String::from("Sheet created successfully");
-                                            self.new_sheet_name = String::new();
+                                        },
+                                        _ => {
+                                            self.status = String::from("Please enter valid integers for rows and columns");
                                         }
-                                    },
-                                    _ => {
-                                        self.status = String::from("Please enter valid integers for rows and columns");
                                     }
                                 }
                             }
-                        }
-                        if ui.button("Cancel").clicked() {
-                            self.show_menu = Menu::None;
-                            self.status = String :: from("Ok");
-                        }
+                            if ui.button("Cancel").clicked() {
+                                self.show_menu = Menu::None;
+                                self.status = String::from("Ok");
+                            }
                         });
                     });
                 }
@@ -539,8 +717,7 @@ impl App for SpreadsheetApp {
                 if ui.button("Delete Current Sheet").clicked() {
                     if self.sheets.len() > 0 {
                         self.show_menu = Menu::DeleteSheet;
-                    }
-                    else{
+                    } else {
                         self.status = String::from("No sheet to delete:(");
                     }
                 }
@@ -548,18 +725,26 @@ impl App for SpreadsheetApp {
                     egui::Window::new("Delete Current Sheet").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Are you sure you want to delete this sheet?");
                         if ui.button("Delete").clicked() {
-                            self.sheets.remove(self.current_sheet_index);
+                            let sheet = self.sheets.remove(self.current_sheet_index);
+                            self.undo_stack.push(Action::DeleteSheet {
+                                sheet,
+                                index: self.current_sheet_index,
+                            });
+                            self.redo_stack.clear();
                             if self.current_sheet_index >= self.sheets.len() {
-                                self.current_sheet_index = self.sheets.len() - 1;
+                                self.current_sheet_index = self.sheets.len().saturating_sub(1);
                             }
                             self.show_menu = Menu::None;
+                            self.status = String::from("Sheet deleted");
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.show_menu = Menu::None;
+                            self.status = String::from("Ok");
                         }
                     });
                 }
             });
         });
-        
-
 
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.visuals_mut().override_text_color = Some(self.theme.text_color);
@@ -581,12 +766,10 @@ impl App for SpreadsheetApp {
             });
         });
 
-        // 4) Keyboard handling for modes & scrolling
         let input = ctx.input(|i| i.clone());
         let visible_rows = 20;
         let visible_cols = 15;
         
-        // Mode switching
         if input.key_pressed(egui::Key::I) && self.mode == Mode::Normal {
             self.mode = Mode::Insert;
             self.is_editing = false;
@@ -605,20 +788,15 @@ impl App for SpreadsheetApp {
             if input.key_pressed(egui::Key::ArrowLeft) && c > 0 { new_selection = Some((r, c - 1)); }
             if input.key_pressed(egui::Key::ArrowRight) && c < self.sheets[self.current_sheet_index].sheet.cols as usize - 1 { new_selection = Some((r, c + 1)); }
         }
-        // If selection changed due to arrow keys
         if new_selection != self.selected_cell {
-            // If we were editing-> discard changes
             if self.is_editing {
                 self.is_editing = false;
                 self.editing_value.clear();
             }
             
-            // Update the selection
             self.selected_cell = new_selection;
             
-            // scrolling with selected cell
             if let Some((r, c)) = self.selected_cell {
-                // checking selected cell out of screen 
                 if (r as i32) < self.row_start { self.row_start = r as i32;} 
                 else if (r as i32) >= self.row_start + visible_rows { self.row_start = (r as i32) - visible_rows + 1;}
                 if (c as i32) < self.col_start { self.col_start = c as i32;} 
@@ -629,7 +807,6 @@ impl App for SpreadsheetApp {
             }
         }
 
-        // Vim-style scroll navigation
         if self.mode == Mode::Normal {
             if input.key_pressed(egui::Key::H) {self.col_start = (self.col_start - 1).max(0);}
             if input.key_pressed(egui::Key::L) {self.col_start = (self.col_start + 1).min(self.sheets[self.current_sheet_index].sheet.cols - 1);}
@@ -637,10 +814,25 @@ impl App for SpreadsheetApp {
             if input.key_pressed(egui::Key::J) {self.row_start = (self.row_start + 1).min(self.sheets[self.current_sheet_index].sheet.rows - 1);}
         }
 
-        // parsing the command from formula bar if entered
         if let Some(cmd) = entered {
             let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
             let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
+            let re_cell_edit = regex::Regex::new(r"^([A-Z]+)(\d+)=.*$").unwrap();
+            let mut cell_edit_action = None;
+
+            if let Some(caps) = re_cell_edit.captures(&cmd) {
+                let col_name = caps.get(1).unwrap().as_str();
+                let row_str = caps.get(2).unwrap().as_str();
+                if let Ok(row) = row_str.parse::<i32>() {
+                    let col = sheet_functions::col_name_to_col_num(col_name);
+                    let row = row - 1;
+                    if sheet_functions::is_valid_cell(row, col, sheet_rows, sheet_cols) {
+                        let old_cell = self.sheets[self.current_sheet_index].sheet.data[row as usize][col as usize].clone();
+                        cell_edit_action = Some((row as usize, col as usize, old_cell, cmd.clone()));
+                    }
+                }
+            }
+
             parser::parse_command(
                 &cmd,
                 &mut self.row_start,
@@ -651,9 +843,21 @@ impl App for SpreadsheetApp {
                 &sheet_cols,
                 &mut self.sheets[self.current_sheet_index].sheet,
             );
+
+            if let Some((row, col, old_cell, command)) = cell_edit_action {
+                let new_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
+                self.undo_stack.push(Action::CellEdit {
+                    sheet_index: self.current_sheet_index,
+                    row,
+                    col,
+                    old_cell,
+                    new_cell,
+                    command,
+                });
+                self.redo_stack.clear();
+            }
         }
         
-        // continuous repainting to ensure UI stays responsive
         ctx.request_repaint();
     }
 }

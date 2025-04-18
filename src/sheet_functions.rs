@@ -236,20 +236,20 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
         let c = &mut sheet.data[row][col];
         (c.op_code, c.cell1.clone(), c.cell2.clone())
     }; 
-    if op_code == 'X' {
+    if op_code == 'X' || op_code == '^' {
         return;
     }
 
     // ── 2) Compute the new value, error flag, and any sleep delta using *only* immutable borrows ──
-    let (new_value, new_string,is_error,is_error2, delta) = {
+    let (new_value, string_value, is_error, is_error2, delta) = {
         // Immutable borrow of the whole sheet
         let s = &*sheet;
 
         let mut err = false;
         let mut val = 0;
+        let mut strval = String::new();
         let mut d = 0;
         let mut err1: bool = false;
-        let mut str: Option<String> = None;
 
         match op_code {
             '=' => {
@@ -258,10 +258,10 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                     err = true;
                 } else {
                     if ref_cell.string.is_some(){
-                    str = ref_cell.string.clone();}
-                    else{
-                        val = ref_cell.value;
-                    }
+                        strval = ref_cell.string.as_ref().unwrap().clone();
+                    }else{
+                        val = ref_cell.value; 
+                    } 
                 }
             }
             '+' | '-' | '*' | '/' => {
@@ -312,7 +312,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             _ => {}
         }
-        (val,str,err, err1, d)
+        (val,strval,err, err1, d)
     };
 
     // ── 3) Finally, write back with one fresh mutable borrow ──
@@ -323,11 +323,10 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             c.is_error = true;
         }
         else {
-            if new_string.is_some(){
-                c.string = new_string;
-            }
-            else{
-                c.value = new_value;
+            if op_code == '=' && string_value != "" {
+                c.string = Some(string_value.clone());
+            } else{
+                c.value  = new_value;
                 c.string = None;
             }
         }
@@ -424,7 +423,6 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let mut ans = 0;
     let mut calc_error = false; 
     let mut calc_error1 = false; 
-    let mut ans_string = None;
     // Create a HashMap named avl_tree where the key is curr_cell_row_col and the value is indegree (0 by default)
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(curr_cell_row_col, 0);
@@ -433,8 +431,15 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     match op_code {
         'X' => {
             ans = sheet.data[curr_cell.row as usize][curr_cell.col as usize].value;
-            ans_string = sheet.data[curr_cell.row as usize][curr_cell.col as usize].string.clone();
             remove_dependency(&curr_cell, sheet);
+            let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
+            cell.op_code = op_code;
+            cell.cell1 = CellInfo { row: -1, col: -1 };
+            cell.cell2 = CellInfo { row: -1, col: -1 };
+        },
+        '^' => {
+            // string case
+            remove_dependency(&curr_cell, sheet); 
             let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
             cell.op_code = op_code;
             cell.cell1 = CellInfo { row: -1, col: -1 };
@@ -454,9 +459,6 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
                 calc_error = true;
             } else {
-                if sheet.data[cell1.row as usize][cell1.col as usize].string.is_some(){
-                    ans_string = sheet.data[cell1.row as usize][cell1.col as usize].string.clone();
-                }
                 ans = sheet.data[cell1.row as usize][cell1.col as usize].value;
             }
             sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
@@ -470,7 +472,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
             cell.cell1 = cell1.clone();
             cell.cell2 = cell2.clone();
-            cell.op_code = op_code; 
+            cell.op_code = op_code;
             let value = (cell2.row as i32) << 16 | (cell2.col as i32 & 0xFFFF); 
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
                 calc_error = true;
@@ -557,17 +559,13 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
     if calc_error == true || calc_error1 == true {
         cell.is_error = true;}
-        else {
-            if ans_string.is_some(){
-                cell.string = ans_string;
-            }
-            else{
-            cell.value  = ans;
-            cell.string = None;}
-        }
-        if cell.op_code == 'Z' {
-            *sleep_timer += ans;
-        }
+    else if cell.op_code != '^'{
+        cell.value  = ans;
+        cell.string = None;
+    }
+    if cell.op_code == 'Z' {
+        *sleep_timer += ans;
+    }
     let sorted = topological_sort(&mut avl_tree, &sheet);  
     *status = String::from("ok");
 

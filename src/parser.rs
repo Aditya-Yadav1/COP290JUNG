@@ -31,6 +31,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
     u -> const*cell or cell*const
     d -> cell/const
     b -> const/cell
+    ^ -> string
 */
 
 pub fn get_op_code(op_code: char, constopcell: bool) -> char {
@@ -154,16 +155,31 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let value = caps.get(3).unwrap().as_str();
-        let c = col_name_to_col_num(ref_col);
-        let r = ref_row - 1;
-        if is_valid_cell(r, c, *total_rows, *total_cols) {
-            let cell = CellInfo { row: r, col: c };
+        let col = col_name_to_col_num(ref_col);
+        let row = ref_row - 1; 
+        if is_valid_cell(row, col, *total_rows, *total_cols) {
+            sheet.data[row as usize][col as usize].string = Some(value.to_string());
+            sheet.data[row as usize][col as usize].value = 0;
+            sheet.data[row as usize][col as usize].is_error = false;
+            *status = String::from("ok");
+            let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            let op_code = 'X';
-            // Temporarily store the string in the cell to pass to add_constraints
-            sheet.data[r as usize][c as usize].string = Some(value.to_string());
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, '^', sheet, status, &mut 0);
+            // Clear existing constraints} 
+            //remove_dependency(&CellInfo { row: r, col: c }, sheet);
+            // Set cell metadata
+            // Trigger recalculation of dependent cells 
+            //let mut avl_tree: HashMap<i32, i32> = HashMap::new();
+            //avl_tree.insert(c * 1000 + r, 0);
+            //add_to_tree(&mut avl_tree, CellInfo { row: r, col: c }, sheet);
+            // let sorted = topological_sort(&mut avl_tree, &sheet);
+            // for i in sorted {
+            //     let row = i % 1000;
+            //     let col = i / 1000;
+            //     recalculate(sheet, row as usize, col as usize, &mut 
+            //         0);
+            // } 
         } else {
             *status = String::from("Invalid cmd");
         }
@@ -186,6 +202,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let (  ans, err) = compute_cell(op, val1, val2, status);
             sheet.data[row as usize][col as usize].value = ans;
             sheet.data[row as usize][col as usize].is_error = err;
+            sheet.data[row as usize][col as usize].string = None;
 
             let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: -1, col: -1 };
@@ -217,16 +234,12 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
            is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) && 
            is_valid_cell(val_row2 - 1, col2, *total_rows, *total_cols) && 
            (op == '+' || op == '-' || op == '*' || op == '/') {
-            let c1 = &sheet.data[(val_row1 as usize - 1) as usize][col1 as usize];
-            let c2 = & sheet.data[(val_row2 as usize - 1) as usize][col2 as usize];
-            if !(c1.string.is_some() || c2.string.is_some()) {
+         
             let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
             let cell2 = CellInfo { row: val_row2 as i32 - 1, col: col2 as i32 }; 
-            sheet_functions::add_constraints(cell, cell1, cell2, op, sheet, status, &mut 0);}
-            else {
-                *status = String::from("Type error");
-            }
+            sheet_functions::add_constraints(cell, cell1, cell2, op, sheet, status, &mut 0);
+             
         } else {
             *status = String::from("Invalid cmd");
         }
@@ -247,9 +260,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         
         if is_valid_cell(row as i32, col as i32, *total_rows, *total_cols) && 
            is_valid_cell(val_row1 - 1, col1 as i32, *total_rows, *total_cols) && 
-           (op == '+' || op == '-' || op == '*' || op == '/') {
-            let c1 = &sheet.data[(val_row1 - 1) as usize][col1 as usize];
-            if !(c1.string.is_some()){
+           (op == '+' || op == '-' || op == '*' || op == '/') { 
             // Splitting the constant into two 16 bit variables
             let const1 = val1 & 0xFFFF;
             let const2 = (val1 >> 16) & 0xFFFF;
@@ -259,10 +270,8 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
             let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
             
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);}
-            else{
-                *status = String::from("Type error");
-            }
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            
         } else {
             *status = String::from("Invalid cmd");
         }
@@ -283,9 +292,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && 
            is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) && 
-           (op == '+' || op == '-' || op == '*' || op == '/') {
-            let c1 = &sheet.data[(val_row1 - 1) as usize][col1 as usize];
-            if !(c1.string.is_some()){
+           (op == '+' || op == '-' || op == '*' || op == '/') { 
             // Splitting the constant into two 16 bit variables
             let const1 = val1 & 0xFFFF;
             let const2 = (val1 >> 16) & 0xFFFF; 
@@ -294,10 +301,8 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
             let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
             
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);}
-            else {
-                *status = String::from("Type error");
-            }
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+          
         } else {
             *status = String::from("Invalid cmd");
         }
@@ -326,27 +331,27 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
        is_valid_cell(row2, col2, *total_rows, *total_cols) &&
        val_row1 <= val_row2 && col1 <= col2 {
 
-        // Check if any cell in the range has a string
-        let mut type_error = false;
-        'outer: for r in row1..=row2 {
-            for c in col1..=col2 {
-                if sheet.data[r as usize][c as usize].string.is_some() {
-                    type_error = true;
-                    break 'outer;
-                }
-            }
-        }
+        // // Check if any cell in the range has a string
+        // let mut type_error = false;
+        // 'outer: for r in row1..=row2 {
+        //     for c in col1..=col2 {
+        //         if sheet.data[r as usize][c as usize].string.is_some() {
+        //             type_error = true;
+        //             break 'outer;
+        //         }
+        //     }
+        // }
 
-        if type_error {
-            *status = String::from("type error");
-        } else {
+        // if type_error {
+        //     *status = String::from("type error");
+        // } else {
             let op_code = func_to_op_code(func_name);
             let cell = CellInfo { row, col };
             let cell1 = CellInfo { row: row1, col: col1 };
             let cell2 = CellInfo { row: row2, col: col2 };
 
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
-        }
+        // }
     } else {
         *status = String::from("Invalid cmd");
     }
@@ -394,15 +399,21 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
             // Use scoped blocks to manage borrows cleanly
- 
+            // let (copy_string, has_string) = {
+            //     let source_cell = &sheet.data[row1 as usize][col1 as usize];
+            //     (source_cell.string.clone(), source_cell.string.is_some())
+            // };
+    
+            // if !has_string {
                 let cell = CellInfo { row, col };
                 let cell1 = CellInfo { row: row1, col: col1 };
                 let cell2 = CellInfo { row: -1, col: -1 };
                 let op_code = '=';
     
                 sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
-
-
+            // } else {
+                // sheet.data[row as usize][col as usize].string = copy_string;
+            // }
         } else {
             *status = String::from("Invalid cmd");
         }
@@ -423,6 +434,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             let cell2 = CellInfo { row: -1, col: -1 };
             sheet.data[row as usize][col as usize].value = val1;
             sheet.data[row as usize][col as usize].is_error = false;
+            sheet.data[row as usize][col as usize].string = None;
             
             let op_code = 'X';
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
@@ -448,13 +460,15 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         let row1 = val_row1 - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
-            let c1_value;
-            let c1_string;
-            {
+            let c1_value; 
+            
             let c1 = & sheet.data[row1 as usize][col1 as usize];
-            c1_value = c1.value;
-            c1_string = c1.string.is_some();}
-            if !(c1_string){
+            if c1.string.is_some() { 
+                c1_value = 0;
+            }else{
+                c1_value = c1.value;
+            }
+            
             let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: row1 as i32, col: col1 as i32 };
             let cell2 = CellInfo { row: -1, col: -1 };
@@ -463,7 +477,6 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             if c1_value >= 0 {
                 * time = c1_value as f32;
                 thread::sleep(Duration::from_secs(c1_value as u64));}
-            }
             else {
                 *status = String::from("Invalid cmd");
             }
