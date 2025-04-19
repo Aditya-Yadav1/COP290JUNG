@@ -19,28 +19,27 @@ Features
         Normal mode for navigation  -> done
         Command mode for operations (VIM-style)
     Data Editing:
-        Text support
+        Text support -> done
         Floating-point numbers
-        Formulas
-        Strings
+        Formulas -> done
+        Strings -> done
     Operations:
-        Cut, copy, paste
-        Undo, redo
+        Cut, copy, paste 
+        Undo, redo -> done
         Find and Replace
         Row and column management
         Sorting capabilities
-    Multi-Sheet Support: Work with multiple sheets
-    File Operations: Load and save files in CSV format
+    Multi-Sheet Support: Work with multiple sheets -> done
+    File Operations: Load and save files in CSV format -> done
 
 Technical Stack & Implementation Details
 Frontend & Framework
 
     Using eframe framework for desktop application
-    egui for user interface components
+    egui for user interface components -> done
 
 Database
 
-    SQLite for efficient handling of:
-        Undo/redo operations
-        Multiple sheets management
-
+    SQLite for efficient handling of:   |
+        Undo/redo operations            | -> done without SQLite
+        Multiple sheets management      |    
