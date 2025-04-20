@@ -552,7 +552,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             sheet.data[cell2.row as usize][cell2.col as usize].dependencies.insert(curr_cell_row_col);
         },
         _ => {
-            *status = String::from("Invalid operation");
+            *status = String::from("err");
             return;
         }
     } 

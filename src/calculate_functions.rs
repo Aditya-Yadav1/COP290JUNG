@@ -85,7 +85,7 @@ pub fn compute_cell(op_code: char, cell_value: i32, cell_value2: i32, status: &m
         }
         'Z' => (cell_value, false),
         _ => {
-            status.push_str("Invalid cmd");
+            status.push_str("err");
             (-1, true)
         }
     }
@@ -93,7 +93,7 @@ pub fn compute_cell(op_code: char, cell_value: i32, cell_value2: i32, status: &m
 
 pub fn compute_range_func(sheet: &Sheet, op_code: char, row1: i32, col1: i32, row2: i32, col2: i32, status: &mut String) -> i32 {
     if col1 > col2 || row1 > row2 {
-        status.push_str("Invalid cmd");
+        status.push_str("err");
         return -1;
     } 
     match op_code {
