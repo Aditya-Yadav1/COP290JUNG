@@ -1,8 +1,7 @@
 use eframe::{egui, App, Frame};
 use serde::{Deserialize, Serialize};
 use crate::{parser, sheet_functions};
-use crate::sheet_functions::{Sheet, col_num_to_col_name, recalculate, Cell};
-use crate::sheet_functions::CellInfo;
+use crate::sheet_functions::{Sheet, col_num_to_col_name, recalculate, Cell, CellInfo, add_constraints};
 use crate::utils::{convert_to_csv, open_csv, save_sheet, load_sheet, save_all_sheets, load_all_sheets};
 use std::collections::HashSet;
 use eframe::epaint::pos2;
@@ -189,14 +188,56 @@ impl SpreadsheetApp {
                     col,
                     old_cell,
                 } => {
+                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
+                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
                     let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    self.sheets[sheet_index].sheet.data[row][col] = old_cell.clone();
+                    // Restore the original cell content
+                    let original_cmd = if old_cell.string.is_some() {
+                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
+                    } else if old_cell.is_error {
+                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
+                    } else {
+                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
+                    };
+                    // Remove dependencies of the current cell
+                    sheet_functions::remove_dependency(
+                        &CellInfo {
+                            row: row as i32,
+                            col: col as i32,
+                        },
+                        &mut self.sheets[sheet_index].sheet,
+                    );
+                    parser::parse_command(
+                        &original_cmd,
+                        &mut self.row_start,
+                        &mut self.col_start,
+                        &mut self.time,
+                        &mut self.status,
+                        &sheet_rows,
+                        &sheet_cols,
+                        &mut self.sheets[sheet_index].sheet,
+                    );
                     self.redo_stack.push(Action::Cut {
                         sheet_index,
                         row,
                         col,
                         old_cell: new_cell,
                     });
+                    // Recalculate the sheet to update dependent cells
+                    let sorted = sheet_functions::topological_sort(
+                        &mut std::collections::HashMap::new(),
+                        &self.sheets[sheet_index].sheet,
+                    );
+                    for i in sorted {
+                        let r = i % 1000;
+                        let c = i / 1000;
+                        sheet_functions::recalculate(
+                            &mut self.sheets[sheet_index].sheet,
+                            r as usize,
+                            c as usize,
+                            &mut self.timer,
+                        );
+                    }
                     self.status = "Undone cut".to_string();
                 }
                 Action::Paste {
@@ -216,6 +257,14 @@ impl SpreadsheetApp {
                     } else {
                         format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                     };
+                    // Remove dependencies of the current cell
+                    sheet_functions::remove_dependency(
+                        &CellInfo {
+                            row: row as i32,
+                            col: col as i32,
+                        },
+                        &mut self.sheets[sheet_index].sheet,
+                    );
                     parser::parse_command(
                         &original_cmd,
                         &mut self.row_start,
@@ -235,6 +284,21 @@ impl SpreadsheetApp {
                         new_cell: new_cell1,
                         command,
                     });
+                    // Recalculate the sheet to update dependent cells
+                    let sorted = sheet_functions::topological_sort(
+                        &mut std::collections::HashMap::new(),
+                        &self.sheets[sheet_index].sheet,
+                    );
+                    for i in sorted {
+                        let r = i % 1000;
+                        let c = i / 1000;
+                        sheet_functions::recalculate(
+                            &mut self.sheets[sheet_index].sheet,
+                            r as usize,
+                            c as usize,
+                            &mut self.timer,
+                        );
+                    }
                     self.status = "Undone paste".to_string();
                 }
             }
@@ -308,21 +372,50 @@ impl SpreadsheetApp {
                     col,
                     old_cell,
                 } => {
+                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
+                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
                     let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    let cell = &mut self.sheets[sheet_index].sheet.data[row][col];
-                    cell.value = 0;
-                    cell.string = None;
-                    cell.is_error = false;
-                    cell.op_code = 'X';
-                    cell.cell1 = CellInfo { row: -1, col: -1 };
-                    cell.cell2 = CellInfo { row: -1, col: -1 };
-                    cell.dependencies = HashSet::new();
+                    // Clear the cell
+                    let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
+                    // Remove dependencies of the current cell
+                    sheet_functions::remove_dependency(
+                        &CellInfo {
+                            row: row as i32,
+                            col: col as i32,
+                        },
+                        &mut self.sheets[sheet_index].sheet,
+                    );
+                    parser::parse_command(
+                        &clear_cmd,
+                        &mut self.row_start,
+                        &mut self.col_start,
+                        &mut self.time,
+                        &mut self.status,
+                        &sheet_rows,
+                        &sheet_cols,
+                        &mut self.sheets[sheet_index].sheet,
+                    );
                     self.undo_stack.push(Action::Cut {
                         sheet_index,
                         row,
                         col,
                         old_cell: new_cell,
                     });
+                    // Recalculate the sheet to update dependent cells
+                    let sorted = sheet_functions::topological_sort(
+                        &mut std::collections::HashMap::new(),
+                        &self.sheets[sheet_index].sheet,
+                    );
+                    for i in sorted {
+                        let r = i % 1000;
+                        let c = i / 1000;
+                        sheet_functions::recalculate(
+                            &mut self.sheets[sheet_index].sheet,
+                            r as usize,
+                            c as usize,
+                            &mut self.timer,
+                        );
+                    }
                     self.status = "Redone cut".to_string();
                 }
                 Action::Paste {
@@ -335,9 +428,17 @@ impl SpreadsheetApp {
                 } => {
                     let sheet_rows = self.sheets[sheet_index].sheet.rows;
                     let sheet_cols = self.sheets[sheet_index].sheet.cols;
-                    let prev_cell = self.sheets[sheet_index].sheet.data[row][col].clone(); // Save current cell state for undo
+                    let prev_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
+                    // Remove dependencies of the current cell
+                    sheet_functions::remove_dependency(
+                        &CellInfo {
+                            row: row as i32,
+                            col: col as i32,
+                        },
+                        &mut self.sheets[sheet_index].sheet,
+                    );
                     parser::parse_command(
-                        &command, // Use the original paste command
+                        &command,
                         &mut self.row_start,
                         &mut self.col_start,
                         &mut self.time,
@@ -351,12 +452,26 @@ impl SpreadsheetApp {
                         sheet_index,
                         row,
                         col,
-                        old_cell: prev_cell, // Store the cell state before redo
+                        old_cell: prev_cell,
                         new_cell: new_cell_after_redo,
-                        command: command.clone(),
+                        command,
                     });
+                    // Recalculate the sheet to update dependent cells
+                    let sorted = sheet_functions::topological_sort(
+                        &mut std::collections::HashMap::new(),
+                        &self.sheets[sheet_index].sheet,
+                    );
+                    for i in sorted {
+                        let r = i % 1000;
+                        let c = i / 1000;
+                        sheet_functions::recalculate(
+                            &mut self.sheets[sheet_index].sheet,
+                            r as usize,
+                            c as usize,
+                            &mut self.timer,
+                        );
+                    }
                     self.status = "Redone paste".to_string();
-                
                 }
             }
         } else {
@@ -496,32 +611,60 @@ impl App for SpreadsheetApp {
 
                         if ui.button("Cut").clicked() {
                             if let Some((row, col)) = self.selected_cell {
-                                // let cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                                let cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                                let command = if cell.string.is_some() {
-                                    format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, cell.string.as_ref().unwrap())
-                                } else if cell.is_error {
+                                let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
+                                let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
+                                let old_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
+                                let command = if old_cell.string.is_some() {
+                                    format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
+                                } else if old_cell.is_error {
                                     format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
                                 } else {
-                                    format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, cell.value)
+                                    format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                                 };
-                                // self.clipboard = Some((cell.clone(), command));
-                                self.clipboard = Some((cell.clone(), command, row, col));
+                                // Store in clipboard
+                                self.clipboard = Some((old_cell.clone(), command, row, col));
+                                // Remove dependencies of the current cell
+                                sheet_functions::remove_dependency(
+                                    &CellInfo {
+                                        row: row as i32,
+                                        col: col as i32,
+                                    },
+                                    &mut self.sheets[self.current_sheet_index].sheet,
+                                );
+                                // Clear the cell
+                                let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
+                                parser::parse_command(
+                                    &clear_cmd,
+                                    &mut self.row_start,
+                                    &mut self.col_start,
+                                    &mut self.time,
+                                    &mut self.status,
+                                    &sheet_rows,
+                                    &sheet_cols,
+                                    &mut self.sheets[self.current_sheet_index].sheet,
+                                );
                                 self.undo_stack.push(Action::Cut {
                                     sheet_index: self.current_sheet_index,
                                     row,
                                     col,
-                                    old_cell: cell,
+                                    old_cell,
                                 });
                                 self.redo_stack.clear();
-                                let cell = &mut self.sheets[self.current_sheet_index].sheet.data[row][col];
-                                cell.value = 0;
-                                cell.string = None;
-                                cell.is_error = false;
-                                cell.op_code = 'X';
-                                cell.cell1 = CellInfo { row: -1, col: -1 };
-                                cell.cell2 = CellInfo { row: -1, col: -1 };
-                                cell.dependencies = HashSet::new();
+                                // Recalculate the sheet to update dependent cells
+                                let sorted = sheet_functions::topological_sort(
+                                    &mut std::collections::HashMap::new(),
+                                    &self.sheets[self.current_sheet_index].sheet,
+                                );
+                                for i in sorted {
+                                    let r = i % 1000;
+                                    let c = i / 1000;
+                                    sheet_functions::recalculate(
+                                        &mut self.sheets[self.current_sheet_index].sheet,
+                                        r as usize,
+                                        c as usize,
+                                        &mut self.timer,
+                                    );
+                                }
                                 self.status = "Cut".to_string();
                             } else {
                                 self.status = "No cell selected".to_string();
@@ -547,8 +690,19 @@ impl App for SpreadsheetApp {
 
                         if ui.button("Paste").clicked() {
                             if let Some((row, col)) = self.selected_cell {
-                                if let Some((cell, command,src_row,src_col)) = self.clipboard.clone() {
+                                if let Some((cell, command, src_row, src_col)) = self.clipboard.clone() {
+                                    let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
+                                    let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
                                     let old_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
+                                    // Remove dependencies of the target cell
+                                    sheet_functions::remove_dependency(
+                                        &CellInfo {
+                                            row: row as i32,
+                                            col: col as i32,
+                                        },
+                                        &mut self.sheets[self.current_sheet_index].sheet,
+                                    );
+                                    // Apply the paste command
                                     let content = if let Some(s) = &cell.string {
                                         s.clone()
                                     } else if cell.is_error {
@@ -556,13 +710,7 @@ impl App for SpreadsheetApp {
                                     } else {
                                         cell.value.to_string()
                                     };
-                                
-                                    // build a new command for the target (row,col)
-                                    let col_name = col_num_to_col_name(col as i32);
-                                    let row_str  = (row + 1).to_string();
-                                    let paste_cmd = format!("{}{}={}", col_name, row_str, content);
-                                    let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
-                                    let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
+                                    let paste_cmd = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, content);
                                     parser::parse_command(
                                         &paste_cmd,
                                         &mut self.row_start,
@@ -570,7 +718,7 @@ impl App for SpreadsheetApp {
                                         &mut self.time,
                                         &mut self.status,
                                         &sheet_rows,
-                                        &&sheet_cols,
+                                        &sheet_cols,
                                         &mut self.sheets[self.current_sheet_index].sheet,
                                     );
                                     let new_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
@@ -583,17 +731,28 @@ impl App for SpreadsheetApp {
                                         command: paste_cmd,
                                     });
                                     self.redo_stack.clear();
+                                    // Recalculate the sheet to update dependent cells
+                                    let sorted = sheet_functions::topological_sort(
+                                        &mut std::collections::HashMap::new(),
+                                        &self.sheets[self.current_sheet_index].sheet,
+                                    );
+                                    for i in sorted {
+                                        let r = i % 1000;
+                                        let c = i / 1000;
+                                        sheet_functions::recalculate(
+                                            &mut self.sheets[self.current_sheet_index].sheet,
+                                            r as usize,
+                                            c as usize,
+                                            &mut self.timer,
+                                        );
+                                    }
                                     self.status = "Pasted".to_string();
-
-                                    
                                 } else {
                                     self.status = "Nothing to paste".to_string();
                                 }
-                                
                             } else {
                                 self.status = "No cell selected".to_string();
                             }
-                        
                         }
 
                         if ui.button("Undo").clicked() {
