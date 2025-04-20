@@ -154,6 +154,7 @@ impl SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[sheet_index].sheet,
+                        &mut true,
                     );
                     let new_cell1 = self.sheets[sheet_index].sheet.data[row][col].clone();
                     self.redo_stack.push(Action::CellEdit {
@@ -254,6 +255,7 @@ impl SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[sheet_index].sheet,
+                        &mut true,
                     );
                     self.redo_stack.push(Action::Cut {
                         sheet_index,
@@ -312,6 +314,7 @@ impl SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[sheet_index].sheet,
+                        &mut true,
                     );
                     let new_cell1 = self.sheets[sheet_index].sheet.data[row][col].clone();
                     self.redo_stack.push(Action::Paste {
@@ -367,6 +370,7 @@ impl SpreadsheetApp {
                         },
                         &mut self.sheets[sheet_index].sheet,
                     );
+                    let mut print_enabled = true;
                     parser::parse_command(
                         &command,
                         &mut self.row_start,
@@ -376,6 +380,7 @@ impl SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[sheet_index].sheet,
+                        &mut print_enabled, 
                     );
                     let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
                     self.undo_stack.push(Action::CellEdit {
@@ -470,6 +475,7 @@ impl SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[sheet_index].sheet,
+                        &mut true,
                     );
                     self.undo_stack.push(Action::Cut {
                         sheet_index,
@@ -522,6 +528,7 @@ impl SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[sheet_index].sheet,
+                        &mut true,
                     );
                     let new_cell_after_redo = self.sheets[sheet_index].sheet.data[row][col].clone();
                     self.undo_stack.push(Action::Paste {
@@ -718,6 +725,7 @@ impl App for SpreadsheetApp {
                                     &sheet_rows,
                                     &sheet_cols,
                                     &mut self.sheets[self.current_sheet_index].sheet,
+                                    &mut true,
                                 );
                                 self.undo_stack.push(Action::Cut {
                                     sheet_index: self.current_sheet_index,
@@ -796,6 +804,7 @@ impl App for SpreadsheetApp {
                                         &sheet_rows,
                                         &sheet_cols,
                                         &mut self.sheets[self.current_sheet_index].sheet,
+                                        &mut true,
                                     );
                                     let new_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
                                     self.undo_stack.push(Action::Paste {
@@ -1016,6 +1025,7 @@ impl App for SpreadsheetApp {
                                                 &sheet_rows,
                                                 &sheet_cols,
                                                 &mut self.sheets[self.current_sheet_index].sheet,
+                                                &mut true,
                                             );
                                             
                                             let new_cell = self.sheets[self.current_sheet_index].sheet.data[r as usize][c as usize].clone();
@@ -1268,6 +1278,7 @@ impl App for SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[self.current_sheet_index].sheet,
+                        &mut true,
                     );
                     self.undo_stack.push(Action::Cut {
                         sheet_index: self.current_sheet_index,
@@ -1348,6 +1359,7 @@ impl App for SpreadsheetApp {
                             &sheet_rows,
                             &sheet_cols,
                             &mut self.sheets[self.current_sheet_index].sheet,
+                            &mut true,
                         );
                         let new_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
                         self.undo_stack.push(Action::Paste {
@@ -1456,6 +1468,7 @@ impl App for SpreadsheetApp {
                 &sheet_rows,
                 &sheet_cols,
                 &mut self.sheets[self.current_sheet_index].sheet,
+                &mut true,
             );
 
             if let Some((row, col, old_cell, command)) = cell_edit_action {

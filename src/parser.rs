@@ -75,7 +75,7 @@ fn remove_space(command: &mut String) {
     *command = command.chars().filter(|&c| c != ' ').collect();
 }
 
-pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32, sheet: &mut Sheet){
+pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32, sheet: &mut Sheet, print_enabled:&mut bool){
     let mut command = command.trim().to_string();
     remove_space(&mut command);
 
@@ -108,13 +108,13 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             std::process::exit(0);
         }
         "enable_output" => {
-            // TODO: Implement this
+            *print_enabled = true;
             *status = String::from("ok");
             *time = 0.0;
             return;
         },
         "disable_output" => {
-            // TODO: Implement this
+            *print_enabled = false;
             *status = String::from("ok");
             *time = 0.0;
             return;
