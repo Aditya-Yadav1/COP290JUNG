@@ -12,6 +12,7 @@ use crate::calculate_functions::compute_cell;
 use crate::sheet_functions::is_valid_cell;
 use crate::sheet_functions::Sheet;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::time::Instant;
 
 /*
     = ->cell
@@ -77,13 +78,14 @@ fn remove_space(command: &mut String) {
 
 pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, time: &mut f32, status: &mut String, total_rows: &i32, total_cols: &i32, sheet: &mut Sheet, print_enabled: &mut bool) {
     let mut command = command.trim().to_string();
+    let mut sleep_timer = 0;
+    let mut start_time = Instant::now();
 
     // Define scroll_to regex
     let re_scroll_to = Regex::new(r"^scroll_to\s([A-Z]+)(\d+)$").unwrap();
 
     // Check if command is scroll_to; if so, process it without removing spaces
     if let Some(caps) = re_scroll_to.captures(&command) {
-        *time = 0.0;
         let col_str = caps.get(1).unwrap().as_str(); // Extract column letters
         let row_num: i32 = caps.get(2).unwrap().as_str().parse().unwrap(); // Extract row number
 
@@ -107,26 +109,18 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
         "w" => {
             *row_start = std::cmp::max(0, *row_start - 10);
             *status = String::from("ok");
-            *time = 0.0;
-            return;
         }
         "s" => {
             *row_start = std::cmp::min(*row_start + 10, total_rows - 1);
             *status = String::from("ok");
-            *time = 0.0;
-            return;
         }
         "a" => {
             *col_start = std::cmp::max(0, *col_start - 10);
             *status = String::from("ok");
-            *time = 0.0;
-            return;
         }
         "d" => {
             *col_start = std::cmp::min(*col_start + 10, total_cols - 1);
             *status = String::from("ok");
-            *time = 0.0;
-            return;
         }
         "q" => {
             std::process::exit(0);
@@ -134,14 +128,10 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
         "enable_output" => {
             *print_enabled = true;
             *status = String::from("ok");
-            *time = 0.0;
-            return;
         }
         "disable_output" => {
             *print_enabled = false;
             *status = String::from("ok");
-            *time = 0.0;
-            return;
         }
         _ => {} // Continue with complex patterns
     }
@@ -160,7 +150,6 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
 
     // Cell = String
     if let Some(caps) = re_string_cell.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let value = caps.get(3).unwrap().as_str();
@@ -174,14 +163,13 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            sheet_functions::add_constraints(cell, cell1, cell2, '^', sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, '^', sheet, status, &mut sleep_timer);
         } else {
             *status = String::from("err");
         }
     }
     // Cell = int op int
     else if let Some(caps) = re_cell_eq_int_op_int.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap();
@@ -201,7 +189,7 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = 'X';
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
             *status = String::from("ok");
         } else {
             *status = String::from("err");
@@ -209,7 +197,6 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
     }
     // Cell = cell op cell
     else if let Some(caps) = re_cell_eq_cell_op_cell.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let val_col1 = caps.get(3).unwrap().as_str();
@@ -230,14 +217,13 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell = CellInfo { row: row as i32, col: col as i32 };
             let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
             let cell2 = CellInfo { row: val_row2 as i32 - 1, col: col2 as i32 };
-            sheet_functions::add_constraints(cell, cell1, cell2, op, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op, sheet, status, &mut sleep_timer);
         } else {
             *status = String::from("err");
         }
     }
     // Cell = int op cell
     else if let Some(caps) = re_cell_eq_int_op_cell.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row = caps.get(2).unwrap().as_str().parse::<i32>().unwrap();
         let val1 = caps.get(3).unwrap().as_str().parse::<i32>().unwrap();
@@ -260,14 +246,13 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
             let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
 
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
         } else {
             *status = String::from("err");
         }
     }
     // Cell = cell op int
     else if let Some(caps) = re_cell_eq_cell_op_int.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let val_col1 = caps.get(3).unwrap().as_str();
@@ -289,14 +274,13 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
             let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
 
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
         } else {
             *status = String::from("err");
         }
     }
     // Cell = func(cell:cell)
     else if let Some(caps) = re_cell_eq_func.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let func_name = caps.get(3).unwrap().as_str();
@@ -318,18 +302,21 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
            is_valid_cell(row2, col2, *total_rows, *total_cols) &&
            val_row1 <= val_row2 && col1 <= col2 {
             let op_code = func_to_op_code(func_name);
+            if op_code == 'X' {
+                *status = String::from("invalid command");
+                return;
+            }
             let cell = CellInfo { row, col };
             let cell1 = CellInfo { row: row1, col: col1 };
             let cell2 = CellInfo { row: row2, col: col2 };
 
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
         } else {
             *status = String::from("err");
         }
     }
     // Cell = int
     else if let Some(caps) = re_cell_eq_int.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap_or_else(|_| {
@@ -348,14 +335,13 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = 'X';
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
         } else {
             *status = String::from("err");
         }
     }
     // Cell = cell
     else if let Some(caps) = re_cell_eq_cell.captures(&command) {
-        *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let val_col1 = caps.get(3).unwrap().as_str();
@@ -372,7 +358,7 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = '=';
 
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
         } else {
             *status = String::from("err");
         }
@@ -396,10 +382,11 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             sheet.data[row as usize][col as usize].string = None;
 
             let op_code = 'X';
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
             if val1 >= 0 {
                 *time = val1 as f32;
-                thread::sleep(Duration::from_secs(val1 as u64));
+                sleep_timer += val1;
+                // thread::sleep(Duration::from_secs(val1 as u64));
             }
         } else {
             *status = String::from("err");
@@ -430,10 +417,10 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
             let cell1 = CellInfo { row: row1 as i32, col: col1 as i32 };
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = 'Z';
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
             if c1_value >= 0 {
-                *time = c1_value as f32;
-                thread::sleep(Duration::from_secs(c1_value as u64));
+                sleep_timer += c1_value;
+                // thread::sleep(Duration::from_secs(c1_value as u64));
             } else {
                 *status = String::from("err");
             }
@@ -442,5 +429,13 @@ pub fn parse_command(command: &str, row_start: &mut i32, col_start: &mut i32, ti
         }
     } else {
         *status = String::from("err");
+    }
+    let elapsed = start_time.elapsed();
+    if elapsed.as_secs_f32() > sleep_timer as f32 {
+        *time = elapsed.as_secs_f32();
+    }
+    else{
+        *time = sleep_timer as f32;
+        thread::sleep(Duration::from_secs((sleep_timer as f32 - elapsed.as_secs_f32()) as u64));
     }
 }

@@ -241,14 +241,13 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
     }
 
     // ── 2) Compute the new value, error flag, and any sleep delta using *only* immutable borrows ──
-    let (new_value, string_value, is_error, is_error2, delta) = {
+    let (new_value, string_value, is_error, is_error2) = {
         // Immutable borrow of the whole sheet
         let s = &*sheet;
 
         let mut err = false;
         let mut val = 0;
         let mut strval = String::new();
-        let mut d = 0;
         let mut err1: bool = false;
 
         match op_code {
@@ -287,7 +286,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                     err = true;
                 } else {
                     val = a.value;
-                    d = val;
+                    *sleep_timer += val;
                 }
             }
             'S' | 'm' | 'M' | 'A' | 'D' => {
@@ -312,7 +311,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             _ => {}
         }
-        (val,strval,err, err1, d)
+        (val,strval,err, err1)
     };
 
     // ── 3) Finally, write back with one fresh mutable borrow ──
@@ -331,7 +330,6 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
         }
     }
-    *sleep_timer += delta;
 }
 
 
@@ -563,15 +561,16 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         cell.value  = ans;
         cell.string = None;
     }
-    if cell.op_code == 'Z' {
-        *sleep_timer += ans;
-    }
+
     let sorted = topological_sort(&mut avl_tree, &sheet);  
     *status = String::from("ok");
 
     for i in sorted.into_iter(){
         let row = i % 1000;
         let col = i / 1000;
+        if row == curr_cell.row && col == curr_cell.col {
+            continue;
+        }
         recalculate(sheet, row as usize, col as usize, sleep_timer);
     }  
 } 
