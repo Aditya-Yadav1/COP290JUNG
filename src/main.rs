@@ -5,8 +5,10 @@ mod parser;
 mod calculate_functions;
 mod utils;
 mod themes;
+mod app_impl;
+use app_impl::SpreadsheetApp;
 use crate::sheet_functions::Sheet;
-use crate::ui::Sheets;
+use crate::app_impl::Sheets;
 use std::env;
 fn main() -> Result<(), eframe::Error> {
     let args : Vec<String> = env::args().collect();
@@ -25,7 +27,7 @@ fn main() -> Result<(), eframe::Error> {
             Box::new(|_cc| {
                 let sheet = Sheet::new(20, 10);
                 let sheets = vec![Sheets{sheet:sheet.clone(), name:String::from("Sheet 1")}];
-                Box::new(ui::SpreadsheetApp::new(sheets))
+                Box::new(SpreadsheetApp::new(sheets))
             }),
         )
     }
