@@ -439,7 +439,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             sheet.data[row as usize][col as usize].is_error = false;
             sheet.data[row as usize][col as usize].string = None;
 
-            let op_code = Sleep;
+            let op_code = NoConstraint;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
             if val1 >= 0 {
                 *time = val1 as f32;
