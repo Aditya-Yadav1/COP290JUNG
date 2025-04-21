@@ -13,7 +13,6 @@ use crate::ui::app_impl::*;
 use crate::ui::menu;
 use crate::ui::sheet_display;
 
-
 impl Default for SpreadsheetApp {
     fn default() -> Self {
         let sheet = Sheet::new(20, 10);
@@ -179,21 +178,19 @@ impl App for SpreadsheetApp {
         let visible_rows = 20;
         let visible_cols = 15;
         
-        // Handle shortcut keys only when not editing a cell or formula bar
         if !self.is_editing {
-            // Ctrl+Z for Undo
             if input.modifiers.ctrl && input.key_pressed(egui::Key::Z) {
                 self.undo();
                 ctx.request_repaint();
             }
-
-            // Ctrl+Y for Redo
             if input.modifiers.ctrl && input.key_pressed(egui::Key::Y) {
                 self.redo();
                 ctx.request_repaint();
             }
-
-            // Ctrl+X for Cut
+            if input.modifiers.ctrl && input.key_pressed(egui::Key::F) {
+                self.show_menu = Menu::FindAndReplace;
+                ctx.request_repaint();
+            }
             if input.modifiers.ctrl && input.key_pressed(egui::Key::X) {
                 if let Some((row, col)) = self.selected_cell {
                     let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
@@ -206,9 +203,7 @@ impl App for SpreadsheetApp {
                     } else {
                         format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                     };
-                    // Store in clipboard
                     self.clipboard = Some((old_cell.clone(), command, row, col));
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -216,7 +211,6 @@ impl App for SpreadsheetApp {
                         },
                         &mut self.sheets[self.current_sheet_index].sheet,
                     );
-                    // Clear the cell
                     let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
                     parser::parse_command(
                         &clear_cmd,
@@ -236,7 +230,6 @@ impl App for SpreadsheetApp {
                         old_cell,
                     });
                     self.redo_stack.clear();
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[self.current_sheet_index].sheet,
@@ -256,8 +249,6 @@ impl App for SpreadsheetApp {
                     self.status = "No cell selected".to_string();
                 }
             }
-
-            // Ctrl+C for Copy
             if input.modifiers.ctrl && input.key_pressed(egui::Key::C) {
                 if let Some((row, col)) = self.selected_cell {
                     let cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
@@ -274,15 +265,12 @@ impl App for SpreadsheetApp {
                     self.status = "No cell selected".to_string();
                 }
             }
-
-            // Ctrl+V for Paste
             if input.modifiers.ctrl && input.key_pressed(egui::Key::V) {
                 if let Some((row, col)) = self.selected_cell {
                     if let Some((cell, command, src_row, src_col)) = self.clipboard.clone() {
                         let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
                         let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
                         let old_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                        // Remove dependencies of the target cell
                         sheet_functions::remove_dependency(
                             &CellInfo {
                                 row: row as i16,
@@ -290,7 +278,6 @@ impl App for SpreadsheetApp {
                             },
                             &mut self.sheets[self.current_sheet_index].sheet,
                         );
-                        // Apply the paste command
                         let content = if let Some(s) = &cell.string {
                             s.clone()
                         } else if cell.is_error {
@@ -320,7 +307,6 @@ impl App for SpreadsheetApp {
                             command: paste_cmd,
                         });
                         self.redo_stack.clear();
-                        // Recalculate the sheet to update dependent cells
                         let sorted = sheet_functions::topological_sort(
                             &mut std::collections::HashMap::new(),
                             &self.sheets[self.current_sheet_index].sheet,
@@ -436,6 +422,4 @@ impl App for SpreadsheetApp {
         
         ctx.request_repaint();
     }
-
-
 }

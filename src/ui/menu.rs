@@ -6,7 +6,6 @@ use crate::sheet_functions::OpCode::*;
 use std::collections::HashSet;
 use crate::ui::utils::{load_all_sheets,save_all_sheets,convert_to_csv,open_csv};
 
-
 pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::Ui)->egui::CollapsingResponse<()>{
     egui::CollapsingHeader::new("Menu")
     .default_open(true)
@@ -82,6 +81,33 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                 });
             }
 
+            if app.show_menu == Menu::None && ui.button("Find and Replace").clicked() {
+                app.show_menu = Menu::FindAndReplace;
+            }
+            if app.show_menu == Menu::FindAndReplace {
+                egui::Window::new("Find and Replace").resizable(false).collapsible(false).show(ctx, |ui| {
+                    ui.label("Find:");
+                    ui.text_edit_singleline(&mut app.find_text);
+                    ui.label("Replace with:");
+                    ui.text_edit_singleline(&mut app.replace_text);
+                    ui.horizontal(|ui| {
+                        if ui.button("Replace All").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            if app.find_text.is_empty() {
+                                app.status = "Please enter text to find".to_string();
+                            } else {
+                                app.find_and_replace();
+                                app.show_menu = Menu::None;
+                            }
+                        }
+                        if ui.button("Cancel").clicked() {
+                            app.show_menu = Menu::None;
+                            app.find_text.clear();
+                            app.replace_text.clear();
+                        }
+                    });
+                });
+            }
+
             if ui.button("Clear").clicked() {
                 let old_data = app.sheets[app.current_sheet_index].sheet.data.clone();
                 for row in &mut app.sheets[app.current_sheet_index].sheet.data {
@@ -115,9 +141,7 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                     } else {
                         format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                     };
-                    // Store in clipboard
                     app.clipboard = Some((old_cell.clone(), command, row, col));
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -125,7 +149,6 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                         },
                         &mut app.sheets[app.current_sheet_index].sheet,
                     );
-                    // Clear the cell
                     let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
                     parser::parse_command(
                         &clear_cmd,
@@ -145,7 +168,6 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                         old_cell,
                     });
                     app.redo_stack.clear();
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &app.sheets[app.current_sheet_index].sheet,
@@ -189,7 +211,6 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                         let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
                         let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;
                         let old_cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
-                        // Remove dependencies of the target cell
                         sheet_functions::remove_dependency(
                             &CellInfo {
                                 row: row as i16,
@@ -197,7 +218,6 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                             },
                             &mut app.sheets[app.current_sheet_index].sheet,
                         );
-                        // Apply the paste command
                         let content = if let Some(s) = &cell.string {
                             s.clone()
                         } else if cell.is_error {
@@ -227,7 +247,6 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                             command: paste_cmd,
                         });
                         app.redo_stack.clear();
-                        // Recalculate the sheet to update dependent cells
                         let sorted = sheet_functions::topological_sort(
                             &mut std::collections::HashMap::new(),
                             &app.sheets[app.current_sheet_index].sheet,

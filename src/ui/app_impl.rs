@@ -51,6 +51,10 @@ pub enum Action {
         new_cell: Cell,
         command: String,
     },
+    FindAndReplace {
+        sheet_index: usize,
+        changes: Vec<(usize, usize, Cell, Cell, String)>, // (row, col, old_cell, new_cell, command)
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -63,9 +67,9 @@ pub enum Menu {
     Theme,
     NewSheet,
     DeleteSheet,
+    FindAndReplace,
     None,
 }
-
 
 pub struct SpreadsheetApp {
     pub sheets: Vec<Sheets>,
@@ -89,9 +93,10 @@ pub struct SpreadsheetApp {
     pub new_sheet_name: String,
     pub undo_stack: Vec<Action>,
     pub redo_stack: Vec<Action>,
-    pub clipboard: Option<(Cell, String, usize, usize)>, // Stores (cell, command, row, col) for copy/cut
+    pub clipboard: Option<(Cell, String, usize, usize)>,
+    pub find_text: String,
+    pub replace_text: String,
 }
-
 
 impl SpreadsheetApp {
     pub fn new(mut sheets: Vec<Sheets>) -> Self {
@@ -118,6 +123,75 @@ impl SpreadsheetApp {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             clipboard: None,
+            find_text: String::new(),
+            replace_text: String::new(),
+        }
+    }
+
+    pub fn find_and_replace(&mut self) {
+        let mut sheet = &mut self.sheets[self.current_sheet_index].sheet;
+        let mut changes = Vec::new();
+        let find_text = self.find_text.clone();
+        let replace_text = self.replace_text.clone();
+
+        for row in 0..sheet.rows as usize {
+            for col in 0..sheet.cols as usize {
+                let cell = &sheet.data[row][col];
+                let cell_content = if let Some(s) = &cell.string {
+                    s.clone()
+                } else if cell.is_error {
+                    "Err".to_string()
+                } else {
+                    cell.value.to_string()
+                };
+
+                if cell_content == find_text {
+                    let mut sheet1 = sheet.clone();
+                    let old_cell = cell.clone();
+                    let command = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, replace_text);
+                    sheet_functions::remove_dependency(
+                        &CellInfo {
+                            row: row as i16,
+                            col: col as i16,
+                        },
+                        sheet,
+                    );
+                    parser::parse_command(
+                        &command,
+                        &mut self.row_start,
+                        &mut self.col_start,
+                        &mut self.time,
+                        &mut self.status,
+                        &sheet1.rows,
+                        &sheet1.cols,
+                        & mut sheet,
+                        &mut true,
+                    );
+                    let new_cell = sheet.data[row][col].clone();
+                    changes.push((row, col, old_cell, new_cell, command));
+                }
+            }
+        }
+
+        if !changes.is_empty() {
+            let len = changes.len();
+            self.undo_stack.push(Action::FindAndReplace {
+                sheet_index: self.current_sheet_index,
+                changes,
+            });
+            self.redo_stack.clear();
+            let sorted = sheet_functions::topological_sort(
+                &mut std::collections::HashMap::new(),
+                sheet,
+            );
+            for i in sorted {
+                let r = i % 1000;
+                let c = i / 1000;
+                sheet_functions::recalculate(sheet, r as usize, c as usize, &mut self.timer);
+            }
+            self.status = format!("Replaced {} instances", len);
+        } else {
+            self.status = "No matches found".to_string();
         }
     }
 
@@ -141,7 +215,6 @@ impl SpreadsheetApp {
                     } else {
                         format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                     };
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -169,7 +242,6 @@ impl SpreadsheetApp {
                         new_cell: new_cell1,
                         command: command.clone(),
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -208,7 +280,6 @@ impl SpreadsheetApp {
                         sheet_index,
                         old_data: new_data,
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -234,7 +305,6 @@ impl SpreadsheetApp {
                     let sheet_rows = self.sheets[sheet_index].sheet.rows;
                     let sheet_cols = self.sheets[sheet_index].sheet.cols;
                     let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    // Restore the original cell content
                     let original_cmd = if old_cell.string.is_some() {
                         format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
                     } else if old_cell.is_error {
@@ -242,7 +312,6 @@ impl SpreadsheetApp {
                     } else {
                         format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                     };
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -267,7 +336,6 @@ impl SpreadsheetApp {
                         col,
                         old_cell: new_cell,
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -301,7 +369,6 @@ impl SpreadsheetApp {
                     } else {
                         format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                     };
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -329,7 +396,6 @@ impl SpreadsheetApp {
                         new_cell: new_cell1,
                         command,
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -345,6 +411,59 @@ impl SpreadsheetApp {
                         );
                     }
                     self.status = "Undone paste".to_string();
+                }
+                Action::FindAndReplace { sheet_index, changes } => {
+                    let mut sheet = &mut self.sheets[sheet_index].sheet;
+                    let mut sheet1 = sheet.clone();
+                    let mut redo_changes = Vec::new();
+                    for (row, col, old_cell, new_cell, command) in changes {
+                        let original_cmd = if old_cell.string.is_some() {
+                            format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
+                        } else if old_cell.is_error {
+                            format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
+                        } else {
+                            format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
+                        };
+                        sheet_functions::remove_dependency(
+                            &CellInfo {
+                                row: row as i16,
+                                col: col as i16,
+                            },
+                            sheet,
+                        );
+                        parser::parse_command(
+                            &original_cmd,
+                            &mut self.row_start,
+                            &mut self.col_start,
+                            &mut self.time,
+                            &mut self.status,
+                            &sheet1.rows,
+                            &sheet1.cols,
+                            &mut sheet,
+                            &mut true,
+                        );
+                        let new_cell_after_undo = sheet.data[row][col].clone();
+                        redo_changes.push((row, col, old_cell.clone(), new_cell_after_undo, command));
+                    }
+                    self.redo_stack.push(Action::FindAndReplace {
+                        sheet_index,
+                        changes: redo_changes,
+                    });
+                    let sorted = sheet_functions::topological_sort(
+                        &mut std::collections::HashMap::new(),
+                        sheet,
+                    );
+                    for i in sorted {
+                        let r = i % 1000;
+                        let c = i / 1000;
+                        sheet_functions::recalculate(
+                            sheet,
+                            r as usize,
+                            c as usize,
+                            &mut self.timer,
+                        );
+                    }
+                    self.status = "Undone find and replace".to_string();
                 }
             }
         } else {
@@ -366,7 +485,6 @@ impl SpreadsheetApp {
                     let sheet_rows = self.sheets[sheet_index].sheet.rows;
                     let sheet_cols = self.sheets[sheet_index].sheet.cols;
                     let old_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -384,7 +502,7 @@ impl SpreadsheetApp {
                         &sheet_rows,
                         &sheet_cols,
                         &mut self.sheets[sheet_index].sheet,
-                        &mut print_enabled, 
+                        &mut print_enabled,
                     );
                     let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
                     self.undo_stack.push(Action::CellEdit {
@@ -395,7 +513,6 @@ impl SpreadsheetApp {
                         new_cell,
                         command,
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -434,7 +551,6 @@ impl SpreadsheetApp {
                         sheet_index,
                         old_data: new_data,
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -460,9 +576,7 @@ impl SpreadsheetApp {
                     let sheet_rows = self.sheets[sheet_index].sheet.rows;
                     let sheet_cols = self.sheets[sheet_index].sheet.cols;
                     let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    // Clear the cell
                     let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -487,7 +601,6 @@ impl SpreadsheetApp {
                         col,
                         old_cell: new_cell,
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -515,7 +628,6 @@ impl SpreadsheetApp {
                     let sheet_rows = self.sheets[sheet_index].sheet.rows;
                     let sheet_cols = self.sheets[sheet_index].sheet.cols;
                     let prev_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -543,7 +655,6 @@ impl SpreadsheetApp {
                         new_cell: new_cell_after_redo,
                         command,
                     });
-                    // Recalculate the sheet to update dependent cells
                     let sorted = sheet_functions::topological_sort(
                         &mut std::collections::HashMap::new(),
                         &self.sheets[sheet_index].sheet,
@@ -560,10 +671,56 @@ impl SpreadsheetApp {
                     }
                     self.status = "Redone paste".to_string();
                 }
+                Action::FindAndReplace { sheet_index, changes } => {
+                    let mut sheet = &mut self.sheets[sheet_index].sheet;
+                    let  sheet1 = sheet.clone();
+                    let mut undo_changes = Vec::new();
+                    for (row, col, old_cell, new_cell, command) in changes {
+                        let prev_cell = sheet.data[row][col].clone();
+                        sheet_functions::remove_dependency(
+                            &CellInfo {
+                                row: row as i16,
+                                col: col as i16,
+                            },
+                            sheet,
+                        );
+                        parser::parse_command(
+                            &command,
+                            &mut self.row_start,
+                            &mut self.col_start,
+                            &mut self.time,
+                            &mut self.status,
+                            &sheet1.rows,
+                            &sheet1.cols,
+                            &mut sheet,
+                            &mut true,
+                        );
+                        let new_cell_after_redo = sheet.data[row][col].clone();
+                        undo_changes.push((row, col, prev_cell, new_cell_after_redo, command));
+                    }
+                    self.undo_stack.push(Action::FindAndReplace {
+                        sheet_index,
+                        changes: undo_changes,
+                    });
+                    let sorted = sheet_functions::topological_sort(
+                        &mut std::collections::HashMap::new(),
+                        sheet,
+                    );
+                    for i in sorted {
+                        let r = i % 1000;
+                        let c = i / 1000;
+                        sheet_functions::recalculate(
+                            sheet,
+                            r as usize,
+                            c as usize,
+                            &mut self.timer,
+                        );
+                    }
+                    self.status = "Redone find and replace".to_string();
+                }
             }
         } else {
             self.status = "Nothing to redo".to_string();
         }
     }
 }
-
