@@ -80,7 +80,6 @@ pub fn func_to_op_code(func: &str) -> OpCode {
         "MAX" => Max,
         "AVG" => Avg,
         "STDEV" => Stdev,
-        "SLEEP" => Sleep,
         _ => NoConstraint
     }
 }
