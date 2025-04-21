@@ -4,8 +4,8 @@ use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
 use serde::{Serialize, Deserialize};
 use crate::sheet_functions::{self,Sheet,Cell};
-use crate::themes::{self,Theme};
-use crate::themes::themes;
+use crate::ui::themes::{self,Theme};
+use crate::ui::themes::themes;
 
 use std::string::String;
 

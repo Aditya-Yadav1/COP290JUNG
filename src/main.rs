@@ -1,14 +1,11 @@
 // src/main.rs
-mod ui;
+mod app;
 mod sheet_functions;
 mod parser;
 mod calculate_functions;
-mod utils;
-mod themes;
-mod app_impl;
-use app_impl::SpreadsheetApp;
+mod ui;
+use ui::app_impl::{SpreadsheetApp,Sheets};
 use crate::sheet_functions::Sheet;
-use crate::app_impl::Sheets;
 use std::env;
 fn main() -> Result<(), eframe::Error> {
     let args : Vec<String> = env::args().collect();
