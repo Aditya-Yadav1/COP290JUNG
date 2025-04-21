@@ -6,6 +6,9 @@ use crate::utils::{convert_to_csv, open_csv, save_sheet, load_sheet, save_all_sh
 use std::collections::HashSet;
 use eframe::epaint::pos2;
 use crate::themes::{themes, Theme};  
+use crate::sheet_functions::OpCode;
+use crate::sheet_functions::OpCode::*;
+use std::string::String;
 
 #[derive(Debug, PartialEq)]
 enum Mode { Normal, Insert }
@@ -140,8 +143,8 @@ impl SpreadsheetApp {
                     // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i32,
-                            col: col as i32,
+                            row: row as i16,
+                            col: col as i16,
                         },
                         &mut self.sheets[sheet_index].sheet,
                     );
@@ -241,8 +244,8 @@ impl SpreadsheetApp {
                     // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i32,
-                            col: col as i32,
+                            row: row as i16,
+                            col: col as i16,
                         },
                         &mut self.sheets[sheet_index].sheet,
                     );
@@ -300,8 +303,8 @@ impl SpreadsheetApp {
                     // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i32,
-                            col: col as i32,
+                            row: row as i16,
+                            col: col as i16,
                         },
                         &mut self.sheets[sheet_index].sheet,
                     );
@@ -365,8 +368,8 @@ impl SpreadsheetApp {
                     // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i32,
-                            col: col as i32,
+                            row: row as i16,
+                            col: col as i16,
                         },
                         &mut self.sheets[sheet_index].sheet,
                     );
@@ -461,8 +464,8 @@ impl SpreadsheetApp {
                     // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i32,
-                            col: col as i32,
+                            row: row as i16,
+                            col: col as i16,
                         },
                         &mut self.sheets[sheet_index].sheet,
                     );
@@ -514,8 +517,8 @@ impl SpreadsheetApp {
                     // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i32,
-                            col: col as i32,
+                            row: row as i16,
+                            col: col as i16,
                         },
                         &mut self.sheets[sheet_index].sheet,
                     );
@@ -678,7 +681,7 @@ impl App for SpreadsheetApp {
                                     cell.value = 0;
                                     cell.string = None;
                                     cell.is_error = false;
-                                    cell.op_code = 'X';
+                                    cell.op_code = NoConstraint;
                                     cell.cell1 = CellInfo { row: -1, col: -1 };
                                     cell.cell2 = CellInfo { row: -1, col: -1 };
                                     cell.dependencies = HashSet::new();
@@ -709,8 +712,8 @@ impl App for SpreadsheetApp {
                                 // Remove dependencies of the current cell
                                 sheet_functions::remove_dependency(
                                     &CellInfo {
-                                        row: row as i32,
-                                        col: col as i32,
+                                        row: row as i16,
+                                        col: col as i16,
                                     },
                                     &mut self.sheets[self.current_sheet_index].sheet,
                                 );
@@ -781,8 +784,8 @@ impl App for SpreadsheetApp {
                                     // Remove dependencies of the target cell
                                     sheet_functions::remove_dependency(
                                         &CellInfo {
-                                            row: row as i32,
-                                            col: col as i32,
+                                            row: row as i16,
+                                            col: col as i16,
                                         },
                                         &mut self.sheets[self.current_sheet_index].sheet,
                                     );
@@ -1262,8 +1265,8 @@ impl App for SpreadsheetApp {
                     // Remove dependencies of the current cell
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i32,
-                            col: col as i32,
+                            row: row as i16,
+                            col: col as i16,
                         },
                         &mut self.sheets[self.current_sheet_index].sheet,
                     );
@@ -1336,8 +1339,8 @@ impl App for SpreadsheetApp {
                         // Remove dependencies of the target cell
                         sheet_functions::remove_dependency(
                             &CellInfo {
-                                row: row as i32,
-                                col: col as i32,
+                                row: row as i16,
+                                col: col as i16,
                             },
                             &mut self.sheets[self.current_sheet_index].sheet,
                         );

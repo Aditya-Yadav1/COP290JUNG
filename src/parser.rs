@@ -13,6 +13,9 @@ use crate::sheet_functions::is_valid_cell;
 use crate::sheet_functions::Sheet;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
+use crate::sheet_functions::OpCode;
+use crate::sheet_functions::OpCode::*;
+use std::string::String;
 
 /*
     = ->cell
@@ -35,16 +38,27 @@ use std::time::Instant;
     ^ -> string
 */
 
-pub fn get_op_code(op_code: char, constopcell: bool) -> char {
+pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
     // function to get opcode for the case of int op cell or cell op int
     match op_code {
-        '+' => 'p',
-        '-' => 's',
-        '*' => 'u',
-        '/' => if constopcell { 'b' } else { 'd' },
-        _ => '\0'
+        '+' => CellPlusConstant,
+        '-' => CellMinusConstant,
+        '*' => CellTimesConstant,
+        '/' => if constopcell { ConstantDividesCell } else { CellDivideConstant },
+        _ => NoConstraint
     }
 }
+
+pub fn get_op_code2(op_code: char) -> OpCode {
+    match op_code {
+        '+' => CellPlusCell,
+        '-' => CellMinusCell,
+        '*' => CellTimesCell,
+        '/' => CellDivideCell,
+        _ => NoConstraint
+    }
+}
+
 
 // pub fn get_op_code_rev(op_code: char) -> char {
 //     // function to get operation from opcode for the case of int op cell or cell op int
@@ -58,16 +72,16 @@ pub fn get_op_code(op_code: char, constopcell: bool) -> char {
 //     }
 // }
 
-pub fn func_to_op_code(func: &str) -> char {
+pub fn func_to_op_code(func: &str) -> OpCode {
     // function for getting opcode for the case of func(cell:cell)
     match func {
-        "SUM" => 'S',
-        "MIN" => 'm',
-        "MAX" => 'M',
-        "AVG" => 'A',
-        "STDEV" => 'D',
-        "SLEEP" => 'Z',
-        _ => 'X' 
+        "SUM" => Sum,
+        "MIN" => Min,
+        "MAX" => Max,
+        "AVG" => Avg,
+        "STDEV" => Stdev,
+        "SLEEP" => Sleep,
+        _ => NoConstraint
     }
 }
 
@@ -150,10 +164,10 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             sheet.data[row as usize][col as usize].value = 0;
             sheet.data[row as usize][col as usize].is_error = false;
             *status = String::from("ok");
-            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            sheet_functions::add_constraints(cell, cell1, cell2, '^', sheet, status, &mut 0);
+            sheet_functions::add_constraints(cell, cell1, cell2, String, sheet, status, &mut 0);
             // Clear existing constraints} 
             //remove_dependency(&CellInfo { row: r, col: c }, sheet);
             // Set cell metadata
@@ -187,15 +201,16 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let row = ref_row - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && (op == '+' || op == '-' || op == '*' || op == '/') {
-            let (  ans, err) = compute_cell(op, val1, val2, status);
+            let op_code = get_op_code(op, false);
+            let (ans, err) = compute_cell(op_code, val1, val2, status);
             sheet.data[row as usize][col as usize].value = ans;
             sheet.data[row as usize][col as usize].is_error = err;
             sheet.data[row as usize][col as usize].string = None;
 
-            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            let op_code = 'X';
+            let op_code = NoConstraint;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             *status = String::from("ok");
         } else {
@@ -222,11 +237,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
            is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) && 
            is_valid_cell(val_row2 - 1, col2, *total_rows, *total_cols) && 
            (op == '+' || op == '-' || op == '*' || op == '/') {
-         
-            let cell = CellInfo { row: row as i32, col: col as i32 };
-            let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
-            let cell2 = CellInfo { row: val_row2 as i32 - 1, col: col2 as i32 }; 
-            sheet_functions::add_constraints(cell, cell1, cell2, op, sheet, status, &mut 0);
+            let op_code = get_op_code2(op);
+            let cell = CellInfo { row: row as i16, col: col as i16 };
+            let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
+            let cell2 = CellInfo { row: val_row2 as i16 - 1, col: col2 as i16 }; 
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
              
         } else {
             *status = String::from("Invalid cmd");
@@ -254,9 +269,9 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let const2 = (val1 >> 16) & 0xFFFF;
             
             let op_code = get_op_code(op, true);
-            let cell = CellInfo { row: row as i32, col: col as i32 };
-            let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
-            let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
+            let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
+            let cell2 = CellInfo { row: const2 as i16, col: const1 as i16 };
             
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             
@@ -285,9 +300,9 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let const1 = val1 & 0xFFFF;
             let const2 = (val1 >> 16) & 0xFFFF; 
             let op_code = get_op_code(op, false);
-                            let cell = CellInfo { row: row as i32, col: col as i32 };
-            let cell1 = CellInfo { row: val_row1 as i32 - 1, col: col1 as i32 };
-            let cell2 = CellInfo { row: const2 as i32, col: const1 as i32 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
+            let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
+            let cell2 = CellInfo { row: const2 as i16, col: const1 as i16 };
             
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
           
@@ -334,9 +349,9 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         //     *status = String::from("type error");
         // } else {
             let op_code = func_to_op_code(func_name);
-            let cell = CellInfo { row, col };
-            let cell1 = CellInfo { row: row1, col: col1 };
-            let cell2 = CellInfo { row: row2, col: col2 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
+            let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
+            let cell2 = CellInfo { row: row2 as i16, col: col2 as i16 };
 
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
         // }
@@ -362,10 +377,10 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             sheet.data[row as usize][col as usize].value = val1;
             sheet.data[row as usize][col as usize].is_error = false;
             *status = String::from("ok");
-            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            let op_code = 'X';
+            let op_code = NoConstraint;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
  
         } else {
@@ -393,10 +408,10 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             // };
     
             // if !has_string {
-                let cell = CellInfo { row, col };
-                let cell1 = CellInfo { row: row1, col: col1 };
+                let cell = CellInfo { row: row as i16, col: col as i16 };
+                let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
                 let cell2 = CellInfo { row: -1, col: -1 };
-                let op_code = '=';
+                let op_code = CellEqualsCell;
     
                 sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut 0);
             // } else {
@@ -417,14 +432,14 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
 
         if is_valid_cell(row, col, *total_rows, *total_cols) {
             *status = String::from("ok");
-            let cell = CellInfo { row: row as i32, col: col as i32 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             sheet.data[row as usize][col as usize].value = val1;
             sheet.data[row as usize][col as usize].is_error = false;
             sheet.data[row as usize][col as usize].string = None;
 
-            let op_code = 'X';
+            let op_code = Sleep;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
             if val1 >= 0 {
                 *time = val1 as f32;
@@ -456,10 +471,10 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
                 c1_value = c1.value;
             }
 
-            let cell = CellInfo { row: row as i32, col: col as i32 };
-            let cell1 = CellInfo { row: row1 as i32, col: col1 as i32 };
+            let cell = CellInfo { row: row as i16, col: col as i16 };
+            let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
             let cell2 = CellInfo { row: -1, col: -1 };
-            let op_code = 'Z';
+            let op_code = Sleep;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
             if c1_value >= 0 {
                 sleep_timer += c1_value;
