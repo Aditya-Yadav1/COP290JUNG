@@ -42,7 +42,12 @@ pub fn max(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
 
 pub fn avg(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32 {
     let total = sum(sheet, val_row1, c1, val_row2, c2);
-    let count = ((val_row2 - val_row1 + 1) * (c2 - c1 + 1)) as i32;
+    let row2 = val_row2 as i32;
+    let col2 = c2 as i32;
+    let row1 = val_row1 as i32;
+    let col1 = c1 as i32;
+
+    let count = ((row2 - row1 + 1)  * (col2 - col1 + 1)) as i32;
     if count > 0 {
         total / count
     } else {
@@ -59,7 +64,12 @@ pub fn stdev(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i
             total += diff * diff;
         }
     }
-    let std = (total as f64 / ((val_row2 - val_row1 + 1) * (c2 - c1 + 1)) as f64).sqrt();
+    let row1 = val_row1 as i32;
+    let row2 = val_row2 as i32;
+    let col1 = c1 as i32;
+    let col2 = c2 as i32;
+    let count = ((row2 - row1 + 1)  * (col2 - col1 + 1)) as i32;
+    let std = (total as f64 / count as f64).sqrt();
     std.round() as i32
 }
 
