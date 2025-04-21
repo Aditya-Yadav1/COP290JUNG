@@ -113,7 +113,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             *status = String::from("ok");
         }
     else if command == "s" {
-            *row_start = std::cmp::min(*row_start + 10, total_rows - 1);   
+            *row_start = std::cmp::min(*row_start + 10, total_rows - 10);   
             *status = String::from("ok");
         }
     else if command == "a" {
@@ -121,7 +121,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             *status = String::from("ok");
         }
     else if command == "d" {
-            *col_start = std::cmp::min(*col_start + 10, total_cols - 1);
+            *col_start = std::cmp::min(*col_start + 10, total_cols - 10);
             *status = String::from("ok");
         }
     else if command == "q" {
@@ -349,6 +349,10 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         //     *status = String::from("type error");
         // } else {
             let op_code = func_to_op_code(func_name);
+            if op_code == NoConstraint {
+                *status = String::from("Invalid cmd");
+                return;
+            }
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
             let cell2 = CellInfo { row: row2 as i16, col: col2 as i16 };
