@@ -80,9 +80,12 @@ impl App for SpreadsheetApp {
                 }
                 if self.show_menu == Menu::NewSheet {
                     egui::Window::new("New Sheet").resizable(false).collapsible(false).show(ctx, |ui| {
-                        ui.label("Enter number of rows:"); 
+                        ui.label("Enter number of rows:");
+                        let rows = ui.text_edit_singleline(&mut self.new_sheet_rows);
                         ui.label("Enter number of columns:"); 
-                        ui.label("Enter sheet name:"); 
+                        let cols = ui.text_edit_singleline(&mut self.new_sheet_cols);
+                        ui.label("Enter sheet name:");
+                        let name = ui.text_edit_singleline(&mut self.new_sheet_name); 
                         ui.horizontal(|ui| {
                             if ui.button("Create").clicked() {
                                 if self.new_sheet_rows.is_empty() || self.new_sheet_cols.is_empty() {
