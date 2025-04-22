@@ -444,6 +444,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let mut ans = 0;
     let mut calc_error = false; 
     let mut calc_error1 = false; 
+    let mut stringans = String::new();
     // Create a HashMap named avl_tree where the key is curr_cell_row_col and the value is indegree (0 by default)
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(curr_cell_row_col, 0);
@@ -466,18 +467,42 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell1 = CellInfo { row: -1, col: -1 };
             cell.cell2 = CellInfo { row: -1, col: -1 };
         },
-        CellEqualsCell | Sleep => {
+        CellEqualsCell =>{
             if check_cycle(&avl_tree, &cell1, &temp) {
                 *status = String::from("circular error"); 
                 return;
             }
             remove_dependency(&curr_cell, sheet);
+            
             let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
             cell.cell1 = cell1.clone();
             cell.cell2 = CellInfo { row: -1, col: -1 };
             cell.op_code = op_code;
             
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
+                calc_error = true;
+            } else {
+                if sheet.data[cell1.row as usize][cell1.col as usize].string.is_some(){
+                    stringans = sheet.data[cell1.row as usize][cell1.col as usize].string.as_ref().unwrap().clone(); 
+                }else{
+                    ans = sheet.data[cell1.row as usize][cell1.col as usize].value;
+                }
+            }
+            sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
+        },
+        Sleep => {
+            if check_cycle(&avl_tree, &cell1, &temp) {
+                *status = String::from("circular error"); 
+                return;
+            }
+            remove_dependency(&curr_cell, sheet);
+            
+            let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
+            cell.cell1 = cell1.clone();
+            cell.cell2 = CellInfo { row: -1, col: -1 };
+            cell.op_code = op_code;
+            
+            if sheet.data[cell1.row as usize][cell1.col as usize].is_error || sheet.data[cell1.row as usize][cell1.col as usize].string.is_some() {
                 calc_error = true;
             } else {
                 ans = sheet.data[cell1.row as usize][cell1.col as usize].value;
@@ -495,7 +520,8 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
             let value = (cell2.row as i32) << 16 | (cell2.col as i32 & 0xFFFF); 
-            if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
+            let a = &sheet.data[cell1.row as usize][cell1.col as usize];
+            if a.is_error || a.string.is_some(){
                 calc_error = true;
             } else {
                 let (a,b) = compute_cell(op_code, 
@@ -515,7 +541,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             
             for i in cell1.row..=cell2.row {
                 for j in cell1.col..=cell2.col {
-                    if sheet.data[i as usize][j as usize].is_error {
+                    if sheet.data[i as usize][j as usize].is_error || sheet.data[i as usize][j as usize].string.is_some() {
                         calc_error = true;
                         break;
                     }
@@ -557,11 +583,11 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell1 = cell1.clone();
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
-            
-            if sheet.data[cell1.row as usize][cell1.col as usize].is_error ||
-               sheet.data[cell2.row as usize][cell2.col as usize].is_error {
+            let a = &sheet.data[cell1.row as usize][cell1.col as usize];
+            let b = &sheet.data[cell2.row as usize][cell2.col as usize];
+            if a.is_error || b.is_error || a.string.is_some()||b.string.is_some(){
                 calc_error = true;
-            } else {
+            }else{
                 let (a,b) = compute_cell(op_code,
                                  sheet.data[cell1.row as usize][cell1.col as usize].value,
                                  sheet.data[cell2.row as usize][cell2.col as usize].value,
@@ -579,6 +605,9 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         cell.value  = ans;
         cell.string = None;
     }
+    if op_code == CellEqualsCell && stringans != "" {
+        cell.string = Some(stringans.clone());
+    } 
 
     let sorted = topological_sort(&mut avl_tree, &sheet);  
     *status = String::from("ok");
@@ -642,7 +671,7 @@ pub fn change_dependecy_set(new_cell: &mut Cell, sheet: &mut Sheet , del_range_d
                 new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
             }
             else{
-                recalculate_dependecy(CellInfo{ row: row as i16, col: col as i16 }, sheet);
+                recalculate(sheet, row as usize, col as usize, &mut 0);
             }
         }
         else if !del_range_dependencies{

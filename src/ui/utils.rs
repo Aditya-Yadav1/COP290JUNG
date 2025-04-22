@@ -267,10 +267,11 @@ pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
             )
         }
         OpCode::Sleep => format!(
-            "{}{}=SLEEP({})",
+            "{}{}=SLEEP({}{})",
             col_num_to_col_name(col as i32),
             row + 1,
-            cell.value
+            col_num_to_col_name(cell.cell1.col as i32),
+            cell.cell1.row + 1,
         ),
         OpCode::String => format!(
             "{}{}=\"string\"",
