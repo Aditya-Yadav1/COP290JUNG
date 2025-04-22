@@ -93,11 +93,7 @@ pub fn paste(app: &mut SpreadsheetApp){
                 let mut new_cell=cell.clone();
                 new_cell.dependencies = old_cell2.dependencies.clone();
                 app.sheets[app.current_sheet_index].sheet.data[row][col] = new_cell.clone();
-                for dependency in new_cell.dependencies {
-                    let dependency_row = dependency % 1000;
-                    let dependency_col = dependency / 1000;
-                    sheet_functions::recalculate_dependecy(CellInfo{ row: dependency_row as i16, col: dependency_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
-                }
+                sheet_functions::recalculate_dependecy(CellInfo{ row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 app.redo_stack.clear();
                 app.undo_stack.push(Action::Inserted{
                     sheet_index: app.current_sheet_index,
