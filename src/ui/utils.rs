@@ -45,7 +45,7 @@ pub fn open_csv(filename: &str,app: &mut SpreadsheetApp)-> String {
     app.create_new_sheet(row,col);
     let sheet = &mut app.sheets[app.current_sheet_index].sheet;
 
-    let mut status = String::from("CSV loaded!");
+    let status;
     let file = match File::open(filename) {
         Ok(f) => f,
         Err(e) => {
