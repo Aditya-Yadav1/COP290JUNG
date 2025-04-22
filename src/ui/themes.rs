@@ -13,7 +13,7 @@ pub struct Theme {
 }
 
 
-pub const THEMES: [Theme; 5] = [
+pub const THEMES: [Theme; 6] = [
     Theme {
         name: "Dark",
         is_light_theme: false,
@@ -63,8 +63,16 @@ pub const THEMES: [Theme; 5] = [
         grid_line_color: Color32::from_rgb(150, 190, 210),
         text_color: Color32::from_rgb(30, 60, 80),
         header_text_color: Color32::from_rgb(20, 40, 60),
-    }
-    
-    
+    },
+    Theme {
+        name: "Cyberpunk Noir",
+        is_light_theme: false,
+        cell_bg: Color32::from_rgb(15, 5, 25),            // Ultra-deep violet black
+        selected_cell_bg: Color32::from_rgb(55, 0, 70),   // Rich neon purple glow
+        header_bg: Color32::from_rgb(90, 0, 120),         // Vibrant ultraviolet
+        grid_line_color: Color32::from_rgb(255, 0, 128),  // Pure neon pink gridlines
+        text_color: Color32::from_rgb(180, 130, 255),     // Soft violet white text
+        header_text_color: Color32::from_rgb(255, 150, 200), // Blush pink for header
+    },
 ];
 

@@ -154,7 +154,6 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
         &CellInfo {row: row2 as i16,col: col2 as i16},
         &mut app.sheets[sheet_index].sheet,
     );
-    println!("previous_cell2: {:?}", previous_cell2);
     let curr_cell1 = app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize].clone();
     let curr_cell2 = app.sheets[sheet_index].sheet.data[row2 as usize][col2 as usize].clone();
     app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize] = previous_cell1;
@@ -268,10 +267,11 @@ pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
             )
         }
         OpCode::Sleep => format!(
-            "{}{}=SLEEP({})",
+            "{}{}=SLEEP({}{})",
             col_num_to_col_name(col as i32),
             row + 1,
-            cell.value
+            col_num_to_col_name(cell.cell1.col as i32),
+            cell.cell1.row + 1,
         ),
         OpCode::String => format!(
             "{}{}=\"string\"",

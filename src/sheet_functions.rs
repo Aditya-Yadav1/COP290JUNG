@@ -7,7 +7,7 @@ use serde::de::{self, Visitor, SeqAccess};
 use std::fmt;
 use std::string::String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize  )]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OpCode {
     NoConstraint,
     CellEqualsCell,
@@ -444,7 +444,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let mut ans = 0;
     let mut calc_error = false; 
     let mut calc_error1 = false; 
-    let mut str= None;
+    let mut stringans = String::new();
     // Create a HashMap named avl_tree where the key is curr_cell_row_col and the value is indegree (0 by default)
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(curr_cell_row_col, 0);
@@ -467,12 +467,13 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell1 = CellInfo { row: -1, col: -1 };
             cell.cell2 = CellInfo { row: -1, col: -1 };
         },
-        CellEqualsCell | Sleep => {
+        CellEqualsCell =>{
             if check_cycle(&avl_tree, &cell1, &temp) {
                 *status = String::from("circular error"); 
                 return;
             }
             remove_dependency(&curr_cell, sheet);
+            
             let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
             cell.cell1 = cell1.clone();
             cell.cell2 = CellInfo { row: -1, col: -1 };
@@ -480,9 +481,30 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
                 calc_error = true;
-            } else if sheet.data[cell1.row as usize][cell1.col as usize].string.is_some(){
-                str = sheet.data[cell1.row as usize][cell1.col as usize].string.clone();
-            }else{
+            } else {
+                if sheet.data[cell1.row as usize][cell1.col as usize].string.is_some(){
+                    stringans = sheet.data[cell1.row as usize][cell1.col as usize].string.as_ref().unwrap().clone(); 
+                }else{
+                    ans = sheet.data[cell1.row as usize][cell1.col as usize].value;
+                }
+            }
+            sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
+        },
+        Sleep => {
+            if check_cycle(&avl_tree, &cell1, &temp) {
+                *status = String::from("circular error"); 
+                return;
+            }
+            remove_dependency(&curr_cell, sheet);
+            
+            let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
+            cell.cell1 = cell1.clone();
+            cell.cell2 = CellInfo { row: -1, col: -1 };
+            cell.op_code = op_code;
+            
+            if sheet.data[cell1.row as usize][cell1.col as usize].is_error || sheet.data[cell1.row as usize][cell1.col as usize].string.is_some() {
+                calc_error = true;
+            } else {
                 ans = sheet.data[cell1.row as usize][cell1.col as usize].value;
             }
 
@@ -499,7 +521,8 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
             let value = (cell2.row as i32) << 16 | (cell2.col as i32 & 0xFFFF); 
-            if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
+            let a = &sheet.data[cell1.row as usize][cell1.col as usize];
+            if a.is_error || a.string.is_some(){
                 calc_error = true;
             } else {
                 let (a,b) = compute_cell(op_code, 
@@ -519,7 +542,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             
             for i in cell1.row..=cell2.row {
                 for j in cell1.col..=cell2.col {
-                    if sheet.data[i as usize][j as usize].is_error {
+                    if sheet.data[i as usize][j as usize].is_error || sheet.data[i as usize][j as usize].string.is_some() {
                         calc_error = true;
                         break;
                     }
@@ -561,11 +584,11 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             cell.cell1 = cell1.clone();
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
-            
-            if sheet.data[cell1.row as usize][cell1.col as usize].is_error ||
-               sheet.data[cell2.row as usize][cell2.col as usize].is_error {
+            let a = &sheet.data[cell1.row as usize][cell1.col as usize];
+            let b = &sheet.data[cell2.row as usize][cell2.col as usize];
+            if a.is_error || b.is_error || a.string.is_some()||b.string.is_some(){
                 calc_error = true;
-            } else {
+            }else{
                 let (a,b) = compute_cell(op_code,
                                  sheet.data[cell1.row as usize][cell1.col as usize].value,
                                  sheet.data[cell2.row as usize][cell2.col as usize].value,
@@ -580,13 +603,12 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
     cell.is_error = calc_error || calc_error1;
     if !cell.is_error && cell.op_code != String {
-        if str.is_some(){
-            cell.string = str;
-        }
-        else{
         cell.value  = ans;
-        cell.string = None;}
+        cell.string = None;
     }
+    if op_code == CellEqualsCell && stringans != "" {
+        cell.string = Some(stringans.clone());
+    } 
 
     let sorted = topological_sort(&mut avl_tree, &sheet);  
     *status = String::from("ok");
@@ -599,7 +621,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         }
         recalculate(sheet, row as usize, col as usize, sleep_timer);
     }  
-} 
+}
 
 
 pub fn update_dependencies(old_cell_row: i16, old_cell_col: i16, new_cell_row: i16, new_cell_col: i16, sheet: &mut Sheet) {
@@ -650,7 +672,7 @@ pub fn change_dependecy_set(new_cell: &mut Cell, sheet: &mut Sheet , del_range_d
                 new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
             }
             else{
-                recalculate_dependecy(CellInfo{ row: row as i16, col: col as i16 }, sheet);
+                recalculate(sheet, row as usize, col as usize, &mut 0);
             }
         }
         else if !del_range_dependencies{
@@ -672,5 +694,48 @@ pub fn recalculate_dependecy(curr_cell: CellInfo, sheet: &mut Sheet) {
             continue;
         }
         recalculate(sheet, row as usize, col as usize, &mut 0);
+    }
+}
+
+
+
+pub fn sort_sheet(sheet: &mut Sheet, col1: i32, row1: i32, col2: i32, row2: i32, sort_key: &str, is_column: bool, sort_order: &str) {
+    let mut vec: Vec<Vec<Cell>> = Vec::new();
+    if is_column{
+        for i in row1..=row2{
+            let mut temp: Vec<Cell> = Vec::new();
+            for j in col1..=col2{
+                temp.push(sheet.data[i as usize][j as usize].clone());
+            }
+            vec.push(temp);
+        }
+        let col_num = col_name_to_col_num(sort_key);
+        if sort_order == "asc"{
+            vec.sort_by_key(|k| k[(col_num - col1 )as usize].clone().value);
+        }
+        else{
+            vec.sort_by_key(|k| k[(col_num - col1) as usize].clone().value);
+        }
+    }
+    else{
+        for i in col1..=col2{
+            let mut temp: Vec<Cell> = Vec::new();
+            for j in row1..=row2{
+                temp.push(sheet.data[j as usize][i as usize].clone());
+            }
+            vec.push(temp);
+        }
+        let row_num = sort_key.parse::<i32>().unwrap() - 1;
+        if sort_order == "asc"{
+            vec.sort_by_key(|k| k[(row_num - row1) as usize].clone().value);
+        }
+        else{
+            vec.sort_by_key(|k| k[(row_num - row1) as usize].clone().value);
+        }
+    }
+    for i in row1..=row2{
+        for j in col1..=col2{
+            sheet.data[i as usize][j as usize] = vec[i as usize][j as usize].clone();
+        }
     }
 }

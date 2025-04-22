@@ -66,7 +66,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
     let re_sleep_int = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\((\d+)\)$").unwrap();
     let re_sleep_cell = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\(([A-Z]+)(\d+)\)$").unwrap();
     let re_string_cell = Regex::new(r"^([A-Z]+)([0-9]+)=([a-z_.,:;\-/@#$%^&!?()\[\]{}<>\s]*)$").unwrap();
-    let re_sort = Regex::new(r"^SORT\(\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*(asc|desc)\s*\)$").unwrap();
+    let re_sort = Regex::new(r"^SORT\(\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*([A-Z]+|\d+)\s*;\s*(asc|desc)\s*\)$").unwrap();
     remove_space(&mut command);
 
    
@@ -130,20 +130,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             sheet_functions::add_constraints(cell, cell1, cell2, String, sheet, status, &mut sleep_timer);
-            // Clear existing constraints} 
-            //remove_dependency(&CellInfo { row: r, col: c }, sheet);
-            // Set cell metadata
-            // Trigger recalculation of dependent cells 
-            //let mut avl_tree: HashMap<i32, i32> = HashMap::new();
-            //avl_tree.insert(c * 1000 + r, 0);
-            //add_to_tree(&mut avl_tree, CellInfo { row: r, col: c }, sheet);
-            // let sorted = topological_sort(&mut avl_tree, &sheet);
-            // for i in sorted {
-            //     let row = i % 1000;
-            //     let col = i / 1000;
-            //     recalculate(sheet, row as usize, col as usize, &mut 
-            //         0);
-            // } 
+             
         } else {
             *status = String::from("Invalid cmd");
         }
@@ -367,22 +354,13 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         let row1 = val_row1 - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
-            // Use scoped blocks to manage borrows cleanly
-            // let (copy_string, has_string) = {
-            //     let source_cell = &sheet.data[row1 as usize][col1 as usize];
-            //     (source_cell.string.clone(), source_cell.string.is_some())
-            // };
-    
-            // if !has_string {
+            
                 let cell = CellInfo { row: row as i16, col: col as i16 };
                 let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
                 let cell2 = CellInfo { row: -1, col: -1 };
                 let op_code = CellEqualsCell;
     
                 sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
-            // } else {
-                // sheet.data[row as usize][col as usize].string = copy_string;
-            // }
         } else {
             *status = String::from("Invalid cmd");
         }
@@ -403,8 +381,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             let cell2 = CellInfo { row: -1, col: -1 };
             sheet.data[row as usize][col as usize].value = val1;
             sheet.data[row as usize][col as usize].is_error = false;
-            sheet.data[row as usize][col as usize].string = None;
-
+            sheet.data[row as usize][col as usize].string = None; 
             let op_code = NoConstraint;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
             if val1 >= 0 {
@@ -458,25 +435,60 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         let ref_row1: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let ref_col2 = caps.get(3).unwrap().as_str();
         let ref_row2: i32 = caps.get(4).unwrap().as_str().parse().unwrap();
-        let ref_col3 = caps.get(5).unwrap().as_str();
-        let ref_row3: i32 = caps.get(6).unwrap().as_str().parse().unwrap();
-        let ref_col4 = caps.get(7).unwrap().as_str();
-        let ref_row4: i32 = caps.get(8).unwrap().as_str().parse().unwrap();
+        let sort_key = caps.get(5).unwrap().as_str(); 
+        let sort_order = caps.get(6).unwrap().as_str();
 
+        let is_column = sort_key.chars().all(|c| c.is_ascii_alphabetic());
         let col1 = col_name_to_col_num(ref_col1);
         let row1 = ref_row1 - 1;
         let col2 = col_name_to_col_num(ref_col2);
         let row2 = ref_row2 - 1;
-        let col3 = col_name_to_col_num(ref_col3);
-        let row3 = ref_row3 - 1;
-        let col4 = col_name_to_col_num(ref_col4);
-        let row4 = ref_row4 - 1;
 
-        println!("{} {} {} {} {} {} {} {}", col1, row1, col2, row2, col3, row3, col4, row4);
-           
-    }
-    else {
-        *status = String::from("err");
+        if (col2<col1) || (row2<row1){
+            *status = String::from("wrong range");
+            *time = 0.0;
+            return;
+        }
+        if is_column {
+            let sort_col = col_name_to_col_num(sort_key);
+            if sort_col > col2 || sort_col < col1 {
+                *status = String::from("sorted column out of range");
+                *time = 0.0;
+                return;
+            }
+            for i in row1..=row2{
+                if sheet.data[i as usize][sort_col as usize].string.is_some(){
+                    *status = String::from("sorted column has string");
+                    *time = 0.0;
+                    return;
+                }
+            }
+        }
+        else{
+            let sort_row = sort_key.parse::<i32>().unwrap() - 1;
+            if sort_row > row2 || sort_row < row1{
+                *status = String::from("sorted row out of range");
+                *time = 0.0;
+                return;
+            }
+            for i in col1..=col2{
+                if sheet.data[sort_row as usize][i as usize].string.is_some(){
+                    *status = String::from("sorted row has string");
+                    *time = 0.0;
+                    return;
+                }
+            }
+        }
+        for i in row1..=row2{
+            for j in col1..=col2{
+                if sheet.data[i as usize][j as usize].op_code != NoConstraint && sheet.data[i as usize][j as usize].op_code != String {
+                    *status = String::from("range has constraints");
+                    *time = 0.0;
+                    return;
+                }
+            }
+        }
+        sheet_functions::sort_sheet(sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
     }
 
     let elapsed = start_time.elapsed();
