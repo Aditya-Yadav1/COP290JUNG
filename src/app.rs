@@ -1,6 +1,12 @@
 use eframe::{egui, App, Frame};
-use crate::{parser, sheet_functions};
-use crate::sheet_functions::{Sheet, col_num_to_col_name }; 
+use crate::{parser, sheet_functions}; 
+use crate::sheet_functions::{Sheet, col_num_to_col_name, recalculate, Cell, CellInfo, add_constraints};
+use crate::ui::utils::{convert_to_csv, open_csv, save_all_sheets, load_all_sheets};
+use std::collections::HashSet;
+use eframe::epaint::pos2;
+use crate::ui::themes::{THEMES, Theme};  
+use crate::sheet_functions::OpCode;
+use crate::sheet_functions::OpCode::*;
 use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
@@ -96,18 +102,7 @@ impl App for SpreadsheetApp {
                                                 if self.new_sheet_name.is_empty() {
                                                     self.new_sheet_name = format!("Sheet {}", self.sheets.len() + 1);
                                                 }
-                                                let new_sheet = Sheet::new(rows, cols);
-                                                let sheet_struct = Sheets {
-                                                    sheet: new_sheet.clone(),
-                                                    name: self.new_sheet_name.clone(),
-                                                };
-                                                self.sheets.push(sheet_struct.clone());
-                                                let new_index = self.sheets.len() - 1;
-                                                self.current_sheet_index = new_index;
-                                                self.redo_stack.clear();
-                                                self.show_menu = Menu::None;
-                                                self.status = String::from("Sheet created successfully");
-                                                self.new_sheet_name = String::new();
+                                                self.create_new_sheet(rows, cols);
                                             }
                                         },
                                         _ => {

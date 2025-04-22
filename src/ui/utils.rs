@@ -38,8 +38,14 @@ pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
 }
 
 
-pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
-    let status;
+pub fn open_csv(filename: &str,app: &mut SpreadsheetApp)-> String {
+    let row= 10;
+    let col= 10;
+    app.new_sheet_name = filename.to_string();
+    app.create_new_sheet(row,col);
+    let sheet = &mut app.sheets[app.current_sheet_index].sheet;
+
+    let mut status = String::from("CSV loaded!");
     let file = match File::open(filename) {
         Ok(f) => f,
         Err(e) => {
@@ -87,6 +93,8 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
             })
             .collect();
         sheet.data.push(row);
+        sheet.rows = sheet.data.len() as i32;
+        sheet.cols = sheet.data[0].len() as i32;
     }
 
     if has_error {
@@ -99,16 +107,6 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
 }
 
 
-// pub fn save_sheet(sheet: &Sheet, filename: &str) {
-//     let json = serde_json::to_string_pretty(sheet).unwrap();
-//     let mut file = File::create(filename).unwrap();
-//     file.write_all(json.as_bytes()).unwrap();
-// }
-
-// pub fn load_sheet(filename: &str) -> Sheet {
-//     let data = fs::read_to_string(filename).unwrap();
-//     serde_json::from_str(&data).unwrap()
-// }
 
 pub fn save_all_sheets(sheets: &Vec<Sheets>, filename: &str) {
     let file = File::create(filename).unwrap();

@@ -642,7 +642,7 @@ pub fn change_dependecy_set(new_cell: &mut Cell, sheet: &mut Sheet , del_range_d
                 new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
             }
             else{
-                recalculate(sheet, row as usize, col as usize, &mut 0);
+                recalculate_dependecy(CellInfo{ row: row as i16, col: col as i16 }, sheet);
             }
         }
         else if !del_range_dependencies{
