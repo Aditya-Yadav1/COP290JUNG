@@ -7,6 +7,46 @@ mod ui;
 use ui::app_impl::{SpreadsheetApp,Sheets};
 use crate::sheet_functions::Sheet;
 use std::env;
+use egui::{FontData, FontDefinitions, FontFamily};
+
+fn setup_custom_fonts(ctx: &egui::Context) {
+    let mut fonts = FontDefinitions::default();
+
+    // 1) Embed your main Unicode font first:
+    fonts.font_data.insert(
+        "noto_sans".to_owned(),
+        FontData::from_static(include_bytes!("../assets/fonts/NotoSans-VariableFont_wdth,wght.ttf")),
+    );
+
+    // 2) Embed your emoji font second:
+    fonts.font_data.insert(
+        "emoji".to_owned(),
+        FontData::from_static(include_bytes!("../assets/fonts/Symbola-Emoji.ttf")),
+    );
+
+    // 3) For proportional text: use NOTO_SANS first, then EMOJI as fallback
+    {
+        let prop = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
+        prop.clear();
+        prop.push("noto_sans".to_owned());
+        prop.push("emoji".to_owned());
+        // then you can let the rest (default egui fonts) follow automatically
+    }
+
+    // 4) Likewise for monospace if you need it:
+    {
+        let mono = fonts.families.get_mut(&FontFamily::Monospace).unwrap();
+        mono.clear();
+        mono.push("noto_sans".to_owned());
+        mono.push("emoji".to_owned());
+    }
+
+    ctx.set_fonts(fonts);
+
+    // bump the body‐text size so color emojis look right 
+}
+
+
 fn main() -> Result<(), eframe::Error> {
     let args : Vec<String> = env::args().collect();
 
@@ -21,8 +61,9 @@ fn main() -> Result<(), eframe::Error> {
         eframe::run_native(
             "Rusty Spreadsheet GUI",
             options,
-            Box::new(|_cc| {
-                let sheet = Sheet::new(20, 10);
+            Box::new(|cc| {
+                setup_custom_fonts(&cc.egui_ctx);
+                let sheet = Sheet::new(20, 20);
                 let sheets = vec![Sheets{sheet:sheet.clone(), name:String::from("Sheet 1")}];
                 Box::new(SpreadsheetApp::new(sheets))
             }),
@@ -59,3 +100,4 @@ fn main() -> Result<(), eframe::Error> {
         }
     }
 }
+

@@ -197,7 +197,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                         cell_size,
                                         egui::Label::new(
                                             egui::RichText::new(display)
-                                                .color(app.theme.text_color)
+                                            .color(app.theme.text_color)
                                         ).sense(egui::Sense::click()),
                                     );
                                     
