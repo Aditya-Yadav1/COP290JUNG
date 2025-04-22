@@ -5,7 +5,9 @@ use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
 use crate::ui::sheet_display; 
-use crate::ui::utils::get_cell_formula;
+use crate::ui::utils::get_cell_formula; 
+
+
 
 impl Default for SpreadsheetApp {
     fn default() -> Self {
@@ -17,6 +19,7 @@ impl Default for SpreadsheetApp {
         SpreadsheetApp::new(sheets)
     }
 }
+ 
 
 impl App for SpreadsheetApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) { 

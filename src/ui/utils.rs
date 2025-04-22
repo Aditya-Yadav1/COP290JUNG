@@ -280,3 +280,4 @@ pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
         ),
     }
 }
+
