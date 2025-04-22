@@ -1,13 +1,6 @@
 use eframe::{egui, App, Frame};
-use serde::{Deserialize, Serialize};
 use crate::{parser, sheet_functions};
-use crate::sheet_functions::{Sheet, col_num_to_col_name, recalculate, Cell, CellInfo, add_constraints};
-use crate::ui::utils::{convert_to_csv, open_csv, save_sheet, load_sheet, save_all_sheets, load_all_sheets};
-use std::collections::HashSet;
-use eframe::epaint::pos2;
-use crate::ui::themes::{themes, Theme};  
-use crate::sheet_functions::OpCode;
-use crate::sheet_functions::OpCode::*;
+use crate::sheet_functions::{Sheet, col_num_to_col_name }; 
 use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
@@ -76,12 +69,9 @@ impl App for SpreadsheetApp {
                 }
                 if self.show_menu == Menu::NewSheet {
                     egui::Window::new("New Sheet").resizable(false).collapsible(false).show(ctx, |ui| {
-                        ui.label("Enter number of rows:");
-                        let rows = ui.text_edit_singleline(&mut self.new_sheet_rows);
-                        ui.label("Enter number of columns:");
-                        let cols = ui.text_edit_singleline(&mut self.new_sheet_cols);
-                        ui.label("Enter sheet name:");
-                        let name = ui.text_edit_singleline(&mut self.new_sheet_name);
+                        ui.label("Enter number of rows:"); 
+                        ui.label("Enter number of columns:"); 
+                        ui.label("Enter sheet name:"); 
                         ui.horizontal(|ui| {
                             if ui.button("Create").clicked() {
                                 if self.new_sheet_rows.is_empty() || self.new_sheet_cols.is_empty() {
@@ -136,8 +126,7 @@ impl App for SpreadsheetApp {
                 if self.show_menu == Menu::DeleteSheet {
                     egui::Window::new("Delete Current Sheet").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Are you sure you want to delete this sheet?");
-                        if ui.button("Delete").clicked() {
-                            let sheet = self.sheets.remove(self.current_sheet_index);
+                        if ui.button("Delete").clicked() { 
                             self.redo_stack.clear();
                             if self.current_sheet_index >= self.sheets.len() {
                                 self.current_sheet_index = self.sheets.len().saturating_sub(1);
@@ -281,8 +270,7 @@ impl App for SpreadsheetApp {
                 &mut true,
             );
 
-            if let Some((row, col, old_cell, command)) = cell_edit_action {
-                let new_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
+            if let Some((row, col, old_cell, _)) = cell_edit_action { 
                //ku
                 self.undo_stack.push(Action::Inserted {
                     sheet_index: self.current_sheet_index,

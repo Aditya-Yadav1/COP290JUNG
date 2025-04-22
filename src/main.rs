@@ -11,7 +11,7 @@ fn main() -> Result<(), eframe::Error> {
     let args : Vec<String> = env::args().collect();
 
     if args.len()==1{
-        println!("To run sheet in terminal, enter 0 , for gui enter 1");
+        println!("To run sheet in terminal, enter row and column , for gui enter cargo run gui");
         return Ok(());
     }
 

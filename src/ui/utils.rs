@@ -5,12 +5,11 @@ use std::io::{BufReader, BufRead};
 use crate::sheet_functions::Cell;
 use crate::sheet_functions::CellInfo;
 use std::collections::HashSet;
-use std::fs;
 use crate::ui::app_impl::Sheets;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use flate2::read::GzDecoder;
-use crate::sheet_functions::{self,OpCode};
+use crate::sheet_functions::{self};
 use crate::sheet_functions::OpCode::*;
 use crate::ui::app_impl::{Action,SpreadsheetApp};
 use std::string::String;
@@ -38,7 +37,7 @@ pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
 
 
 pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
-    let mut status = String::from("CSV loaded!");
+    let status;
     let file = match File::open(filename) {
         Ok(f) => f,
         Err(e) => {
@@ -49,7 +48,7 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
     let reader = BufReader::new(file);
     sheet.data.clear();
     let mut has_error = false;
-    for (line_num, line) in reader.lines().enumerate() {
+    for (_, line) in reader.lines().enumerate() {
         let line = match line {
             Ok(l) => l,
             Err(_) => {
@@ -98,19 +97,19 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
 }
 
 
-pub fn save_sheet(sheet: &Sheet, filename: &str) {
-    let json = serde_json::to_string_pretty(sheet).unwrap();
-    let mut file = File::create(filename).unwrap();
-    file.write_all(json.as_bytes()).unwrap();
-}
+// pub fn save_sheet(sheet: &Sheet, filename: &str) {
+//     let json = serde_json::to_string_pretty(sheet).unwrap();
+//     let mut file = File::create(filename).unwrap();
+//     file.write_all(json.as_bytes()).unwrap();
+// }
 
-pub fn load_sheet(filename: &str) -> Sheet {
-    let data = fs::read_to_string(filename).unwrap();
-    serde_json::from_str(&data).unwrap()
-}
+// pub fn load_sheet(filename: &str) -> Sheet {
+//     let data = fs::read_to_string(filename).unwrap();
+//     serde_json::from_str(&data).unwrap()
+// }
 
 pub fn save_all_sheets(sheets: &Vec<Sheets>, filename: &str) {
-    let mut file = File::create(filename).unwrap();
+    let file = File::create(filename).unwrap();
     let encoder = GzEncoder::new(file, Compression::default());
     serde_json::to_writer_pretty(encoder, sheets).unwrap();   
 }
@@ -129,10 +128,10 @@ pub fn insert_undo(sheet_index: usize, row: i16, col: i16, previous_cell: Cell, 
     let curr_cell = app.sheets[sheet_index].sheet.data[row as usize][col as usize].clone();
     let old_cell = previous_cell.clone();
     if old_cell.cell1.row != -1 && old_cell.cell1.col != -1 {
-        app.sheets[app.current_sheet_index].sheet.data[old_cell.cell1.row as usize][old_cell.cell1.col as usize].dependencies.insert((col as i32 * 1000 + row as i32));
+        app.sheets[app.current_sheet_index].sheet.data[old_cell.cell1.row as usize][old_cell.cell1.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
     }
     if old_cell.cell2.row != -1 && old_cell.cell2.col != -1 {
-        app.sheets[app.current_sheet_index].sheet.data[old_cell.cell2.row as usize][old_cell.cell2.col as usize].dependencies.insert((col as i32 * 1000 + row as i32));
+        app.sheets[app.current_sheet_index].sheet.data[old_cell.cell2.row as usize][old_cell.cell2.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
     }
     app.sheets[sheet_index].sheet.data[row as usize][col as usize] = old_cell;
 
@@ -165,16 +164,16 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
     let cell2_1 = app.sheets[sheet_index].sheet.data[row2 as usize][col2 as usize].cell1.clone();
     let cell2_2 = app.sheets[sheet_index].sheet.data[row2 as usize][col2 as usize].cell2.clone();
     if cell1_1.row != -1 && cell1_1.col != -1 {
-       app.sheets[sheet_index].sheet.data[cell1_1.row as usize][cell1_1.col as usize].dependencies.insert((col1 as i32 * 1000 + row1 as i32));
+       app.sheets[sheet_index].sheet.data[cell1_1.row as usize][cell1_1.col as usize].dependencies.insert(col1 as i32 * 1000 + row1 as i32);
     }
     if cell1_2.row != -1 && cell1_2.col != -1 {
-        app.sheets[sheet_index].sheet.data[cell1_2.row as usize][cell1_2.col as usize].dependencies.insert((col1 as i32 * 1000 + row1 as i32));
+        app.sheets[sheet_index].sheet.data[cell1_2.row as usize][cell1_2.col as usize].dependencies.insert(col1 as i32 * 1000 + row1 as i32);
     }
     if cell2_1.row != -1 && cell2_1.col != -1 {
-        app.sheets[sheet_index].sheet.data[cell2_1.row as usize][cell2_1.col as usize].dependencies.insert((col2 as i32 * 1000 + row2 as i32));
+        app.sheets[sheet_index].sheet.data[cell2_1.row as usize][cell2_1.col as usize].dependencies.insert(col2 as i32 * 1000 + row2 as i32);
     }
     if cell2_2.row != -1 && cell2_2.col != -1 {
-        app.sheets[sheet_index].sheet.data[cell2_2.row as usize][cell2_2.col as usize].dependencies.insert((col2 as i32 * 1000 + row2 as i32));
+        app.sheets[sheet_index].sheet.data[cell2_2.row as usize][cell2_2.col as usize].dependencies.insert(col2 as i32 * 1000 + row2 as i32);
     }
     sheet_functions::recalculate_dependecy(CellInfo {row: row1 as i16,col: col1 as i16}, &mut app.sheets[sheet_index].sheet);
     sheet_functions::recalculate_dependecy(CellInfo {row: row2 as i16,col: col2 as i16}, &mut app.sheets[sheet_index].sheet);
@@ -188,29 +187,5 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
         previous_cell2 : curr_cell2,
     });
 }
-// pub fn delete_cell_and_update_dependencies(app: &mut SpreadsheetApp, row: i16, col: i16, sheet_num: usize) {
-//     app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize].delete_cell_value();
-//     let old_cell = app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize].clone();
-//     app.undo_stack.push(Action::Deleted {
-//         sheet_index: app.current_sheet_index,
-//         row,
-//         col,
-//         deleted_cell: old_cell,
-//     });
-//     app.redo_stack.clear();
-//     let sorted = sheet_functions::topological_sort(
-//         &mut app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize].dependencies,
-//         &app.sheets[app.current_sheet_index].sheet,
-//     );
-//     for i in sorted {
-//         let r = i % 1000;
-//         let c = i / 1000;
-//         sheet_functions::recalculate(
-//             &mut app.sheets[app.current_sheet_index].sheet,
-//             r as i16,
-//             c as i16,
-//             &mut app.timer,
-//         );
-//     }
-// }
+
     

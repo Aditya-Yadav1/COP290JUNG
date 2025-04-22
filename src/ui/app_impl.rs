@@ -1,11 +1,9 @@
 use crate::sheet_functions::{CellInfo, col_num_to_col_name};
-use crate::parser;
-use crate::sheet_functions::OpCode;
-use crate::sheet_functions::OpCode::*;
+use crate::parser; 
 use serde::{Serialize, Deserialize};
 use crate::sheet_functions::{self,Sheet,Cell};
-use crate::ui::themes::{self,Theme};
-use crate::ui::themes::themes;
+use crate::ui::themes::Theme;
+use crate::ui::themes::THEMES;
 use crate::ui::utils;
 use std::string::String;
 
@@ -29,12 +27,12 @@ pub enum Action {
     //     sheet_index: usize,
     //     old_data: Vec<Vec<Cell>>,
     // },
-    Deleted {
-        sheet_index: usize,
-        row: i16,
-        col: i16,
-        deleted_cell: Cell,
-    },
+    // Deleted {
+    //     sheet_index: usize,
+    //     row: i16,
+    //     col: i16,
+    //     deleted_cell: Cell,
+    // },
     Inserted {
         sheet_index : usize,
         row : i16,
@@ -105,7 +103,7 @@ pub struct SpreadsheetApp {
 }
 
 impl SpreadsheetApp {
-    pub fn new(mut sheets: Vec<Sheets>) -> Self {
+    pub fn new(sheets: Vec<Sheets>) -> Self {
         Self {
             sheets,
             current_sheet_index: 0,
@@ -122,7 +120,7 @@ impl SpreadsheetApp {
             show_menu: Menu::None,
             save_filename: String::from("sheet"),
             open_filename: String::new(),
-            theme: themes[0].clone(),
+            theme: THEMES[0].clone(),
             new_sheet_rows: String::new(),
             new_sheet_cols: String::new(),
             new_sheet_name: String::new(),
@@ -154,7 +152,7 @@ impl SpreadsheetApp {
                 };
 
                 if cell_content == find_text {
-                    let mut sheet1 = sheet.clone();
+                    let sheet1 = sheet.clone();
                     let old_cell = cell.clone();
                     let command = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, replace_text);
                     sheet_functions::remove_dependency(
@@ -215,15 +213,15 @@ impl SpreadsheetApp {
                     utils::cut_undo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self);
                     self.status = "Undone cut".to_string();
                 }
-                Action::Deleted { sheet_index, row, col, deleted_cell } => {
-                    // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
-                    self.status = "Undone delete".to_string();
-                }
+                // Action::Deleted { sheet_index, row, col, deleted_cell } => {
+                //     // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
+                //     self.status = "Undone delete".to_string();
+                // }
                 Action::FindAndReplace { sheet_index, changes } => {
                     let mut sheet = &mut self.sheets[sheet_index].sheet;
-                    let mut sheet1 = sheet.clone();
+                    let sheet1 = sheet.clone();
                     let mut redo_changes = Vec::new();
-                    for (row, col, old_cell, new_cell, command) in changes {
+                    for (row, col, old_cell, _, command) in changes {
                         let original_cmd = if old_cell.string.is_some() {
                             format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
                         } else if old_cell.is_error {
@@ -290,15 +288,15 @@ impl SpreadsheetApp {
                     utils::cut_undo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self);
                     self.status = "Redone cut".to_string();
                 }
-                Action::Deleted { sheet_index, row, col, deleted_cell } => {
-                    // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
-                    self.status = "Redone delete".to_string();
-                }
+                // Action::Deleted { sheet_index, row, col, deleted_cell } => {
+                //     // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
+                //     self.status = "Redone delete".to_string();
+                // }
                 Action::FindAndReplace { sheet_index, changes } => {
                     let mut sheet = &mut self.sheets[sheet_index].sheet;
                     let  sheet1 = sheet.clone();
                     let mut undo_changes = Vec::new();
-                    for (row, col, old_cell, new_cell, command) in changes {
+                    for (row, col, _, _, command) in changes {
                         let prev_cell = sheet.data[row][col].clone();
                         sheet_functions::remove_dependency(
                             &CellInfo {

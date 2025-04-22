@@ -1,7 +1,6 @@
 use crate::calculate_functions::compute_cell;
 use crate::calculate_functions::compute_range_func;
-use crate::calculate_functions;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::ser::SerializeTuple;
 use serde::de::{self, Visitor, SeqAccess};
@@ -47,17 +46,7 @@ pub struct Cell {
     pub cell2: CellInfo,
     pub dependencies: HashSet<i32>,  
 }
-
-#[derive(Clone)]
-pub struct extendedCell{
-    pub value: i32,
-    pub string: Option<String>,
-    pub is_error: bool,
-    pub op_code: OpCode,
-    pub cell1: CellInfo,
-    pub cell2: CellInfo,
-    pub dependencies: HashSet<i32>,  
-}
+ 
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Sheet {
@@ -185,29 +174,6 @@ impl Sheet {
             cols: n,
             data,
         }
-    }
-}
-
-impl Cell {
-    fn default() -> Self {
-        Cell {
-            value: 0,
-            is_error: false,
-            string: None,
-            op_code: NoConstraint,
-            cell1: CellInfo { row: -1, col: -1 },
-            cell2: CellInfo { row: -1, col: -1 },
-            dependencies: HashSet::new(),
-        }
-    }
-
-    fn delete_cell_value(&mut self) {
-        self.value = 0;
-        self.string = None;
-        self.is_error = false;
-        self.op_code = NoConstraint;
-        self.cell1 = CellInfo { row: -1, col: -1 };
-        self.cell2 = CellInfo { row: -1, col: -1 };
     }
 }
 
@@ -461,8 +427,6 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
     curr_cell.cell2 = CellInfo { row: -1, col: -1 };
 }
 
-
- 
 pub fn add_to_tree(mut avl_tree: &mut std::collections::HashMap<i32, i32>, cell: CellInfo, sheet: &Sheet) {
     for &curr in &sheet.data[cell.row as usize][cell.col as usize].dependencies {
         if !avl_tree.contains_key(&curr) {
@@ -607,10 +571,6 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             }
             sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
             sheet.data[cell2.row as usize][cell2.col as usize].dependencies.insert(curr_cell_row_col);
-        },
-        _ => {
-            *status = String::from("err");
-            return;
         }
     } 
     let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
@@ -634,11 +594,10 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
 } 
 
 
-pub fn update_dependencies(old_cell: Cell,old_cell_row: i16, old_cell_col: i16, new_cell_row: i16, new_cell_col: i16, sheet: &mut Sheet) {
+pub fn update_dependencies(old_cell_row: i16, old_cell_col: i16, new_cell_row: i16, new_cell_col: i16, sheet: &mut Sheet) {
     //goes to dependency set of cells depending on old cell and removes the refrence to old cell and adds the refrence to new cell
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
-    avl_tree.insert(new_cell_col as i32 * 1000 + new_cell_row as i32, 0);
-    let temp = CellInfo{ row: -1, col: -1};
+    avl_tree.insert(new_cell_col as i32 * 1000 + new_cell_row as i32, 0); 
     add_to_tree(&mut avl_tree, CellInfo{ row: new_cell_row, col: new_cell_col }, sheet);
 
     let sorted = topological_sort(&mut avl_tree, sheet);
@@ -674,11 +633,11 @@ pub fn change_dependecy_set(new_cell: &mut Cell, sheet: &mut Sheet , del_range_d
     for i in new_cell.dependencies.clone() {
         let row = i%1000;
         let col = i/1000;
-        if (sheet.data[row as usize][col as usize].op_code == Sum ||
+        if sheet.data[row as usize][col as usize].op_code == Sum ||
            sheet.data[row as usize][col as usize].op_code == Min ||
            sheet.data[row as usize][col as usize].op_code == Max ||
            sheet.data[row as usize][col as usize].op_code == Avg ||
-           sheet.data[row as usize][col as usize].op_code == Stdev ) {
+           sheet.data[row as usize][col as usize].op_code == Stdev {
             if del_range_dependencies{
                 new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
             }
