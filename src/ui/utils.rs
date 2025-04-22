@@ -106,16 +106,6 @@ pub fn open_csv(filename: &str,app: &mut SpreadsheetApp)-> String {
 }
 
 
-pub fn save_sheet(sheet: &Sheet, filename: &str) {
-    let json = serde_json::to_string_pretty(sheet).unwrap();
-    let mut file = File::create(filename).unwrap();
-    file.write_all(json.as_bytes()).unwrap();
-}
-
-pub fn load_sheet(filename: &str) -> Sheet {
-    let data = fs::read_to_string(filename).unwrap();
-    serde_json::from_str(&data).unwrap()
-}
 
 pub fn save_all_sheets(sheets: &Vec<Sheets>, filename: &str) {
     let mut file = File::create(filename).unwrap();

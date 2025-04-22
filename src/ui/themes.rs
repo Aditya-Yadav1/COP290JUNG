@@ -13,7 +13,7 @@ pub struct Theme {
 }
 
 
-pub const themes: [Theme; 5] = [
+pub const THEMES: [Theme; 5] = [
     Theme {
         name: "Dark",
         is_light_theme: false,

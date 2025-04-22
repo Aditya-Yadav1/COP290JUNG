@@ -5,7 +5,7 @@ use crate::sheet_functions::OpCode::*;
 use serde::{Serialize, Deserialize};
 use crate::sheet_functions::{self,Sheet,Cell};
 use crate::ui::themes::{self,Theme};
-use crate::ui::themes::themes;
+use crate::ui::themes::THEMES;
 use crate::ui::utils;
 use std::string::String;
 
@@ -122,7 +122,7 @@ impl SpreadsheetApp {
             show_menu: Menu::None,
             save_filename: String::from("sheet"),
             open_filename: String::new(),
-            theme: themes[0].clone(),
+            theme: THEMES[0].clone(),
             new_sheet_rows: String::new(),
             new_sheet_cols: String::new(),
             new_sheet_name: String::new(),

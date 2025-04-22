@@ -1,6 +1,6 @@
 use crate::ui::app_impl::{Menu,Action,SpreadsheetApp,CutCopy};
 use crate::parser;
-use crate::ui::themes::themes;
+use crate::ui::themes::THEMES;
 use crate::sheet_functions::{self,CellInfo,col_num_to_col_name,OpCode};
 use crate::sheet_functions::OpCode::*;
 use std::collections::HashSet;
@@ -271,7 +271,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
             if app.show_menu == Menu::Theme {
                 egui::Window::new("Theme").resizable(false).collapsible(false).show(ctx, |ui| {
                     ui.label("Select theme:");
-                    for theme in &themes {
+                    for theme in &THEMES {
                         if ui.button(theme.name).clicked() {
                             app.theme = theme.clone();
                             app.show_menu = Menu::None;

@@ -5,7 +5,7 @@ use crate::sheet_functions::{Sheet, col_num_to_col_name, recalculate, Cell, Cell
 use crate::ui::utils::{convert_to_csv, open_csv, save_sheet, load_sheet, save_all_sheets, load_all_sheets};
 use std::collections::HashSet;
 use eframe::epaint::pos2;
-use crate::ui::themes::{themes, Theme};  
+use crate::ui::themes::{THEMES, Theme};  
 use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
 use std::string::String;
