@@ -6,10 +6,14 @@ use crate::sheet_functions::Cell;
 use crate::sheet_functions::CellInfo;
 use std::collections::HashSet;
 use std::fs;
-use crate::ui::Sheets;
+use crate::ui::app_impl::Sheets;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use flate2::read::GzDecoder;
+use crate::sheet_functions::OpCode;
+use crate::sheet_functions::OpCode::*;
+use std::string::String;
+
 pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
     let save_file_name = format!("{}.csv", filename);
     let mut file = File::create(save_file_name).unwrap();
@@ -61,7 +65,7 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
                         value: num,
                         string: None,
                         is_error: false,
-                        op_code: 'X',
+                        op_code: NoConstraint,
                         cell1: CellInfo { row: -1, col: -1 },
                         cell2: CellInfo { row: -1, col: -1 },
                         dependencies: HashSet::new()
@@ -71,7 +75,7 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
                             value: 0,
                             string : None,
                             is_error: true,
-                            op_code: 'X',
+                            op_code: NoConstraint,
                             cell1: CellInfo { row: -1, col: -1 },
                             cell2: CellInfo { row: -1, col: -1 },
                             dependencies: HashSet::new()
