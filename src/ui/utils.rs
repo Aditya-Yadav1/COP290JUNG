@@ -154,7 +154,6 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
         &CellInfo {row: row2 as i16,col: col2 as i16},
         &mut app.sheets[sheet_index].sheet,
     );
-    println!("previous_cell2: {:?}", previous_cell2);
     let curr_cell1 = app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize].clone();
     let curr_cell2 = app.sheets[sheet_index].sheet.data[row2 as usize][col2 as usize].clone();
     app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize] = previous_cell1;

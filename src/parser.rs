@@ -66,7 +66,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
     let re_sleep_int = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\((\d+)\)$").unwrap();
     let re_sleep_cell = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\(([A-Z]+)(\d+)\)$").unwrap();
     let re_string_cell = Regex::new(r"^([A-Z]+)([0-9]+)=([a-z_.,:;\-/@#$%^&!?()\[\]{}<>\s]*)$").unwrap();
-    let re_sort = Regex::new(r"^SORT\(\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*(asc|desc)\s*\)$").unwrap();
+    let re_sort = Regex::new(r"^SORT\(\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*([A-Z]+|\d+)\s*;\s*(asc|desc)\s*\)$").unwrap();
     remove_space(&mut command);
 
    
@@ -458,25 +458,60 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         let ref_row1: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
         let ref_col2 = caps.get(3).unwrap().as_str();
         let ref_row2: i32 = caps.get(4).unwrap().as_str().parse().unwrap();
-        let ref_col3 = caps.get(5).unwrap().as_str();
-        let ref_row3: i32 = caps.get(6).unwrap().as_str().parse().unwrap();
-        let ref_col4 = caps.get(7).unwrap().as_str();
-        let ref_row4: i32 = caps.get(8).unwrap().as_str().parse().unwrap();
+        let sort_key = caps.get(5).unwrap().as_str(); 
+        let sort_order = caps.get(6).unwrap().as_str();
 
+        let is_column = sort_key.chars().all(|c| c.is_ascii_alphabetic());
         let col1 = col_name_to_col_num(ref_col1);
         let row1 = ref_row1 - 1;
         let col2 = col_name_to_col_num(ref_col2);
         let row2 = ref_row2 - 1;
-        let col3 = col_name_to_col_num(ref_col3);
-        let row3 = ref_row3 - 1;
-        let col4 = col_name_to_col_num(ref_col4);
-        let row4 = ref_row4 - 1;
 
-        println!("{} {} {} {} {} {} {} {}", col1, row1, col2, row2, col3, row3, col4, row4);
-           
-    }
-    else {
-        *status = String::from("err");
+        if (col2<col1) || (row2<row1){
+            *status = String::from("wrong range");
+            *time = 0.0;
+            return;
+        }
+        if is_column {
+            let sort_col = col_name_to_col_num(sort_key);
+            if sort_col > col2 || sort_col < col1 {
+                *status = String::from("sorted column out of range");
+                *time = 0.0;
+                return;
+            }
+            for i in row1..=row2{
+                if sheet.data[i as usize][sort_col as usize].string.is_some(){
+                    *status = String::from("sorted column has string");
+                    *time = 0.0;
+                    return;
+                }
+            }
+        }
+        else{
+            let sort_row = sort_key.parse::<i32>().unwrap() - 1;
+            if sort_row > row2 || sort_row < row1{
+                *status = String::from("sorted row out of range");
+                *time = 0.0;
+                return;
+            }
+            for i in col1..=col2{
+                if sheet.data[sort_row as usize][i as usize].string.is_some(){
+                    *status = String::from("sorted row has string");
+                    *time = 0.0;
+                    return;
+                }
+            }
+        }
+        for i in row1..=row2{
+            for j in col1..=col2{
+                if sheet.data[i as usize][j as usize].op_code != NoConstraint && sheet.data[i as usize][j as usize].op_code != String {
+                    *status = String::from("range has constraints");
+                    *time = 0.0;
+                    return;
+                }
+            }
+        }
+        sheet_functions::sort_sheet(sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
     }
 
     let elapsed = start_time.elapsed();

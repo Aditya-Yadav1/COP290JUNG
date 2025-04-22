@@ -7,7 +7,7 @@ use serde::de::{self, Visitor, SeqAccess};
 use std::fmt;
 use std::string::String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize  )]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OpCode {
     NoConstraint,
     CellEqualsCell,
@@ -664,5 +664,48 @@ pub fn recalculate_dependecy(curr_cell: CellInfo, sheet: &mut Sheet) {
             continue;
         }
         recalculate(sheet, row as usize, col as usize, &mut 0);
+    }
+}
+
+
+
+pub fn sort_sheet(sheet: &mut Sheet, col1: i32, row1: i32, col2: i32, row2: i32, sort_key: &str, is_column: bool, sort_order: &str) {
+    let mut vec: Vec<Vec<Cell>> = Vec::new();
+    if is_column{
+        for i in row1..=row2{
+            let mut temp: Vec<Cell> = Vec::new();
+            for j in col1..=col2{
+                temp.push(sheet.data[i as usize][j as usize].clone());
+            }
+            vec.push(temp);
+        }
+        let col_num = col_name_to_col_num(sort_key);
+        if sort_order == "asc"{
+            vec.sort_by_key(|k| k[(col_num - col1 )as usize].clone().value);
+        }
+        else{
+            vec.sort_by_key(|k| k[(col_num - col1) as usize].clone().value);
+        }
+    }
+    else{
+        for i in col1..=col2{
+            let mut temp: Vec<Cell> = Vec::new();
+            for j in row1..=row2{
+                temp.push(sheet.data[j as usize][i as usize].clone());
+            }
+            vec.push(temp);
+        }
+        let row_num = sort_key.parse::<i32>().unwrap() - 1;
+        if sort_order == "asc"{
+            vec.sort_by_key(|k| k[(row_num - row1) as usize].clone().value);
+        }
+        else{
+            vec.sort_by_key(|k| k[(row_num - row1) as usize].clone().value);
+        }
+    }
+    for i in row1..=row2{
+        for j in col1..=col2{
+            sheet.data[i as usize][j as usize] = vec[i as usize][j as usize].clone();
+        }
     }
 }
