@@ -37,7 +37,13 @@ pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
 }
 
 
-pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
+pub fn open_csv(filename: &str,app: &mut SpreadsheetApp)-> String {
+    let row= 10;
+    let col= 10;
+    app.new_sheet_name = filename.to_string();
+    app.create_new_sheet(row,col);
+    let sheet = &mut app.sheets[app.current_sheet_index].sheet;
+
     let mut status = String::from("CSV loaded!");
     let file = match File::open(filename) {
         Ok(f) => f,
@@ -86,6 +92,8 @@ pub fn open_csv(filename: &str,sheet: &mut Sheet)-> String {
             })
             .collect();
         sheet.data.push(row);
+        sheet.rows = sheet.data.len() as i32;
+        sheet.cols = sheet.data[0].len() as i32;
     }
 
     if has_error {

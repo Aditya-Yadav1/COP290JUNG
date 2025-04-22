@@ -95,18 +95,7 @@ impl App for SpreadsheetApp {
                                                 if self.new_sheet_name.is_empty() {
                                                     self.new_sheet_name = format!("Sheet {}", self.sheets.len() + 1);
                                                 }
-                                                let new_sheet = Sheet::new(rows, cols);
-                                                let sheet_struct = Sheets {
-                                                    sheet: new_sheet.clone(),
-                                                    name: self.new_sheet_name.clone(),
-                                                };
-                                                self.sheets.push(sheet_struct.clone());
-                                                let new_index = self.sheets.len() - 1;
-                                                self.current_sheet_index = new_index;
-                                                self.redo_stack.clear();
-                                                self.show_menu = Menu::None;
-                                                self.status = String::from("Sheet created successfully");
-                                                self.new_sheet_name = String::new();
+                                                self.create_new_sheet(rows, cols);
                                             }
                                         },
                                         _ => {

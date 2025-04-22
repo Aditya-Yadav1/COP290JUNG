@@ -99,7 +99,7 @@ pub fn paste(app: &mut SpreadsheetApp){
                 for dependency in new_cell.dependencies {
                     let dependency_row = dependency % 1000;
                     let dependency_col = dependency / 1000;
-                    sheet_functions::recalculate(&mut app.sheets[app.current_sheet_index].sheet, dependency_row as usize, dependency_col as usize, &mut 0);
+                    sheet_functions::recalculate_dependecy(CellInfo{ row: dependency_row as i16, col: dependency_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 }
                 app.redo_stack.clear();
                 app.undo_stack.push(Action::Inserted{
@@ -119,7 +119,7 @@ pub fn paste(app: &mut SpreadsheetApp){
     }
 }
 
-pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::Ui)->egui::CollapsingResponse<()>{
+pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::Ui)->egui::CollapsingResponse<()>{
     egui::CollapsingHeader::new("Menu")
     .default_open(true)
     .show(ui, |ui| {
@@ -176,8 +176,9 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                             if app.open_filename.is_empty() {
                                 app.status = "Please enter a filename".to_string();
                             } else if app.open_filename.ends_with(".csv") {
-                                app.show_menu = Menu::None;    
-                                app.status = open_csv(&app.open_filename, &mut app.sheets[app.current_sheet_index].sheet);
+                                app.show_menu = Menu::None;
+                                let name = app.open_filename.clone();
+                                app.status = open_csv(&name, &mut app);
                             } else if app.open_filename.ends_with(".290") {
                                 app.show_menu = Menu::None;
                                 app.sheets = load_all_sheets(&app.open_filename);
