@@ -297,19 +297,19 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
        val_row1 <= val_row2 && col1 <= col2 {
 
         // // Check if any cell in the range has a string
-        // let mut type_error = false;
-        // 'outer: for r in row1..=row2 {
-        //     for c in col1..=col2 {
-        //         if sheet.data[r as usize][c as usize].string.is_some() {
-        //             type_error = true;
-        //             break 'outer;
-        //         }
-        //     }
-        // }
+        let mut type_error = false;
+        'outer: for r in row1..=row2 {
+            for c in col1..=col2 {
+                if sheet.data[r as usize][c as usize].string.is_some() {
+                    type_error = true;
+                    break 'outer;
+                }
+            }
+        }
 
-        // if type_error {
-        //     *status = String::from("type error");
-        // } else {
+        if type_error {
+            *status = String::from("type error");
+        } else {
             let op_code = func_to_op_code(func_name);
             if op_code == NoConstraint {
                 *status = String::from("Invalid cmd");
@@ -321,7 +321,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
 
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
         // }
-    } else {
+    } }else {
         *status = String::from("Invalid cmd");
     }
 }

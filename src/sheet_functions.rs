@@ -444,6 +444,7 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let mut ans = 0;
     let mut calc_error = false; 
     let mut calc_error1 = false; 
+    let mut str= None;
     // Create a HashMap named avl_tree where the key is curr_cell_row_col and the value is indegree (0 by default)
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(curr_cell_row_col, 0);
@@ -479,9 +480,12 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
             
             if sheet.data[cell1.row as usize][cell1.col as usize].is_error {
                 calc_error = true;
-            } else {
+            } else if sheet.data[cell1.row as usize][cell1.col as usize].string.is_some(){
+                str = sheet.data[cell1.row as usize][cell1.col as usize].string.clone();
+            }else{
                 ans = sheet.data[cell1.row as usize][cell1.col as usize].value;
             }
+
             sheet.data[cell1.row as usize][cell1.col as usize].dependencies.insert(curr_cell_row_col);
         },
         CellPlusConstant | CellMinusConstant | CellTimesConstant | CellDivideConstant | ConstantDividesCell => {
@@ -576,8 +580,12 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
     cell.is_error = calc_error || calc_error1;
     if !cell.is_error && cell.op_code != String {
+        if str.is_some(){
+            cell.string = str;
+        }
+        else{
         cell.value  = ans;
-        cell.string = None;
+        cell.string = None;}
     }
 
     let sorted = topological_sort(&mut avl_tree, &sheet);  

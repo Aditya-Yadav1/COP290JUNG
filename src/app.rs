@@ -7,7 +7,6 @@ use crate::ui::menu;
 use crate::ui::sheet_display; 
 use crate::ui::utils::get_cell_formula;
 
-
 impl Default for SpreadsheetApp {
     fn default() -> Self {
         let sheet = Sheet::new(20, 10);
@@ -81,11 +80,11 @@ impl App for SpreadsheetApp {
                 if self.show_menu == Menu::NewSheet {
                     egui::Window::new("New Sheet").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Enter number of rows:");
-                        let rows = ui.text_edit_singleline(&mut self.new_sheet_rows);
+                        let _rows = ui.text_edit_singleline(&mut self.new_sheet_rows);
                         ui.label("Enter number of columns:"); 
-                        let cols = ui.text_edit_singleline(&mut self.new_sheet_cols);
+                        let _cols = ui.text_edit_singleline(&mut self.new_sheet_cols);
                         ui.label("Enter sheet name:");
-                        let name = ui.text_edit_singleline(&mut self.new_sheet_name); 
+                        let _name = ui.text_edit_singleline(&mut self.new_sheet_name); 
                         ui.horizontal(|ui| {
                             if ui.button("Create").clicked() {
                                 if self.new_sheet_rows.is_empty() || self.new_sheet_cols.is_empty() {

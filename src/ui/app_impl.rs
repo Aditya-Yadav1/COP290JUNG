@@ -71,6 +71,7 @@ pub enum Menu {
     NewSheet,
     DeleteSheet,
     FindAndReplace,
+    PlotGraph,
     None,
 }
 
@@ -100,7 +101,16 @@ pub struct SpreadsheetApp {
     pub find_text: String,
     pub replace_text: String,
     pub cut_copied_cell: Option<(i16,i16)>,
+    pub plot_column1: String, // First column name (e.g., "A")
+    pub plot_column2: String, // Second column name (e.g., "B")
+    pub plot_row_start: String, // Start row (e.g., "1")
+    pub plot_row_end: String, // End row (e.g., "5")
+    pub show_plot: bool, // Whether to show the plot window
 }
+
+
+
+
 
 impl SpreadsheetApp {
     pub fn new(sheets: Vec<Sheets>) -> Self {
@@ -130,6 +140,11 @@ impl SpreadsheetApp {
             find_text: String::new(),
             replace_text: String::new(),
             cut_copied_cell : None,
+            plot_column1: String::new(),
+            plot_column2: String::new(),
+            plot_row_start: String::new(),
+            plot_row_end: String::new(),
+            show_plot: false,
         }
     }
 
