@@ -1,7 +1,7 @@
-use crate::ui::app_impl::{Mode,Action,SpreadsheetApp};
+use crate::ui::app_impl::{Mode,Action,SpreadsheetApp}; 
 use crate::sheet_functions::col_num_to_col_name;
 use crate::parser;
-
+ 
 pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_rows: &i32,visible_cols: &i32)->egui::InnerResponse<()>{
     egui::CentralPanel::default().show(ctx, |ui| {
         let cell_size = egui::vec2(120.0, 30.0);
@@ -179,6 +179,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                     if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
                                         app.mode = Mode::Normal;
                                         app.is_editing = false;
+                                        app.selected_cell = None;
                                         app.editing_value.clear();
                                     }
                                     

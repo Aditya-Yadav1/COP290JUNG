@@ -204,6 +204,7 @@ impl App for SpreadsheetApp {
          
         if input.key_pressed(egui::Key::Escape) {
             self.mode = Mode::Normal;
+            self.selected_cell = None;
             self.is_editing = false;
             self.editing_value.clear();
         }

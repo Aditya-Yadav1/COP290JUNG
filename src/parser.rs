@@ -65,7 +65,9 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
     let re_cell_eq_cell = Regex::new(r"^([A-Z]+)(\d+)=([A-Z]+)(\d+)$").unwrap();
     let re_sleep_int = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\((\d+)\)$").unwrap();
     let re_sleep_cell = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\(([A-Z]+)(\d+)\)$").unwrap();
-    let re_string_cell = Regex::new(r#"^([A-Z]+)([0-9]+)="([^"]*)"$"#).unwrap();
+    let re_string_cell = Regex::new(
+        r#"^([A-Z]+)(\d+)="([\p{L}\p{N}\p{P}\p{S}\p{Z}]*)"$"#
+    ).unwrap();  
     let re_sort = Regex::new(r"^SORT\(\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*([A-Z]+|\d+)\s*;\s*(asc|desc)\s*\)$").unwrap();
     remove_space(&mut command);
 
@@ -489,6 +491,9 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             }
         }
         sheet_functions::sort_sheet(sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
+    }
+    else {
+        *status = String::from("Invalid cmd");
     }
 
     let elapsed = start_time.elapsed();
