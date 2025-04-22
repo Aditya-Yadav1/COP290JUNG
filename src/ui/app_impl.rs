@@ -217,15 +217,19 @@ impl SpreadsheetApp {
     }
 
     pub fn undo(&mut self) {
+        if self.undo_stack.is_empty() {
+            self.status = "Nothing to undo".to_string();
+            return;
+        }
         self.clear_clipboard();
         if let Some(action) = self.undo_stack.pop() {
             match action {
                 Action::Inserted {sheet_index,row,col,previous_cell} => {
-                    utils::insert_undo(sheet_index, row, col, previous_cell,self);
+                    utils::insert_undo_redo(sheet_index, row, col, previous_cell,self,false);
                     self.status = "Undone cell edit".to_string();
                 }
                 Action::CutAction {sheet_index,row1,col1,previous_cell1,row2,col2,previous_cell2} => {
-                    utils::cut_undo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self);
+                    utils::cut_undo_redo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self,false);
                     self.status = "Undone cut".to_string();
                 }
                 // Action::Deleted { sheet_index, row, col, deleted_cell } => {
@@ -292,15 +296,19 @@ impl SpreadsheetApp {
     }
 
     pub fn redo(&mut self) {
+        if self.redo_stack.is_empty() {
+            self.status = "Nothing to redo".to_string();
+            return;
+        }
         self.clear_clipboard();
         if let Some(action) = self.redo_stack.pop() {
             match action {
                 Action::Inserted {sheet_index,row,col,previous_cell} => {
-                    utils::insert_undo(sheet_index, row, col, previous_cell,self);
+                    utils::insert_undo_redo(sheet_index, row, col, previous_cell,self,true);
                     self.status = "Redone cell edit".to_string();
                 }
                 Action::CutAction {sheet_index,row1,col1,previous_cell1,row2,col2,previous_cell2} => {
-                    utils::cut_undo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self);
+                    utils::cut_undo_redo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self,true);
                     self.status = "Redone cut".to_string();
                 }
                 // Action::Deleted { sheet_index, row, col, deleted_cell } => {
