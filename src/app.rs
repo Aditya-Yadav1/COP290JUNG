@@ -4,7 +4,9 @@ use crate::sheet_functions::{Sheet, col_num_to_col_name };
 use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
-use crate::ui::sheet_display;
+use crate::ui::sheet_display; 
+use crate::ui::utils::get_cell_formula;
+
 
 impl Default for SpreadsheetApp {
     fn default() -> Self {
@@ -42,7 +44,16 @@ impl App for SpreadsheetApp {
                 }
                 ui.separator();
                 ui.label("Selected Cell:");
-                ui.label("oi deepak formula idhar display kara dena");
+                if let Some((r, c)) = self.selected_cell {
+                    let temp = get_cell_formula(
+                        r as i16,
+                        c as i16,
+                        &self.sheets[self.current_sheet_index].sheet.data[r][c],
+                    );
+                    ui.label(format!("Formula: {}", temp));
+                } else {
+                    ui.label("No cell is selected");
+                }
                 ui.separator();
             });
             menu::show_menu(self, ctx, ui);

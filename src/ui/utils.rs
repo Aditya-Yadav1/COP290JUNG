@@ -10,9 +10,11 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 use flate2::read::GzDecoder;
 use crate::sheet_functions::{self};
+use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
 use crate::ui::app_impl::{Action,SpreadsheetApp};
 use std::string::String;
+use crate::sheet_functions::col_num_to_col_name;
 
 pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
     let save_file_name = format!("{}.csv", filename);
@@ -188,4 +190,95 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
     });
 }
 
-    
+pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
+    match cell.op_code {
+        OpCode::NoConstraint => format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, cell.value),
+        OpCode::CellEqualsCell => format!(
+            "{}{}={}{}",
+            col_num_to_col_name(col as i32),
+            row + 1,
+            col_num_to_col_name(cell.cell1.col as i32),
+            cell.cell1.row + 1
+        ),
+        OpCode::CellPlusCell | OpCode::CellMinusCell | OpCode::CellTimesCell | OpCode::CellDivideCell => {
+            let operator = match cell.op_code {
+                OpCode::CellPlusCell => "+",
+                OpCode::CellMinusCell => "-",
+                OpCode::CellTimesCell => "*",
+                OpCode::CellDivideCell => "/",
+                _ => unreachable!(),
+            };
+            format!(
+                "{}{}={}{}{}{}{}",
+                col_num_to_col_name(col as i32),
+                row + 1,
+                col_num_to_col_name(cell.cell1.col as i32),
+                cell.cell1.row + 1,
+                operator,
+                col_num_to_col_name(cell.cell2.col as i32),
+                cell.cell2.row + 1
+            )
+        }
+        OpCode::CellPlusConstant | OpCode::CellMinusConstant | OpCode::CellTimesConstant | OpCode::CellDivideConstant => {
+            let operator = match cell.op_code {
+                OpCode::CellPlusConstant => "+",
+                OpCode::CellMinusConstant => "-",
+                OpCode::CellTimesConstant => "*",
+                OpCode::CellDivideConstant => "/",
+                _ => unreachable!(),
+            };
+            let constant = ((cell.cell2.row as i32) << 16) | (cell.cell2.col as i32 & 0xFFFF); // Recover 32-bit constant
+            format!(
+                "{}{}={}{}{}{}",
+                col_num_to_col_name(col as i32),
+                row + 1,
+                col_num_to_col_name(cell.cell1.col as i32),
+                cell.cell1.row + 1,
+                operator,
+                constant
+            )
+        }
+        OpCode::ConstantDividesCell => {
+            let constant = ((cell.cell2.row as i32) << 16) | (cell.cell2.col as i32 & 0xFFFF); // Recover 32-bit constant
+            format!(
+                "{}{}={}/{}{}",
+                col_num_to_col_name(col as i32),
+                row + 1,
+                constant,
+                col_num_to_col_name(cell.cell1.col as i32),
+                cell.cell1.row + 1
+            )
+        }
+        OpCode::Sum | OpCode::Min | OpCode::Max | OpCode::Avg | OpCode::Stdev => {
+            let func_name = match cell.op_code {
+                OpCode::Sum => "SUM",
+                OpCode::Min => "MIN",
+                OpCode::Max => "MAX",
+                OpCode::Avg => "AVG",
+                OpCode::Stdev => "STDEV",
+                _ => unreachable!(),
+            };
+            format!(
+                "{}{}={}({}{}:{}{})",
+                col_num_to_col_name(col as i32),
+                row + 1,
+                func_name,
+                col_num_to_col_name(cell.cell1.col as i32),
+                cell.cell1.row + 1,
+                col_num_to_col_name(cell.cell2.col as i32),
+                cell.cell2.row + 1
+            )
+        }
+        OpCode::Sleep => format!(
+            "{}{}=SLEEP({})",
+            col_num_to_col_name(col as i32),
+            row + 1,
+            cell.value
+        ),
+        OpCode::String => format!(
+            "{}{}=\"string\"",
+            col_num_to_col_name(col as i32),
+            row + 1, 
+        ),
+    }
+}
