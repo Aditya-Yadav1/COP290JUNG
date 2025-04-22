@@ -294,9 +294,10 @@ pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
             cell.cell1.row + 1,
         ),
         OpCode::String => format!(
-            "{}{}=\"string\"",
+            "{}{}={}",
             col_num_to_col_name(col as i32),
             row + 1, 
+            cell.string.clone().unwrap_or_else(|| "None".to_string())
         ),
     }
 }
