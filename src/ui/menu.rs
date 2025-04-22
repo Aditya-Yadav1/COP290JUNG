@@ -1,7 +1,6 @@
 use crate::ui::app_impl::{Menu,Action,SpreadsheetApp,CutCopy};
-use crate::parser;
 use crate::ui::themes::THEMES;
-use crate::sheet_functions::{self,CellInfo,col_num_to_col_name,OpCode};
+use crate::sheet_functions::{self,CellInfo};
 use crate::sheet_functions::OpCode::*;
 use std::collections::HashSet;
 use crate::ui::utils::{load_all_sheets,save_all_sheets,convert_to_csv,open_csv};
@@ -34,9 +33,7 @@ pub fn copy(app: &mut SpreadsheetApp){
 
 pub fn paste(app: &mut SpreadsheetApp){
     if let Some((row, col)) = app.selected_cell {
-        if let Some((cell, cut_copy, old_row, old_col)) = app.clipboard.clone() {
-            let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
-            let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;
+        if let Some((cell, cut_copy, old_row, old_col)) = app.clipboard.clone() { 
             let old_cell1 = app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].clone();
             let old_cell2 = app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize].clone();
 
@@ -53,11 +50,11 @@ pub fn paste(app: &mut SpreadsheetApp){
                 
                 if depended_cell1.row != -1 && depended_cell1.col != -1 {
                     app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
-                    app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.insert((col as i32 * 1000 + row as i32));
+                    app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
                 }
                 if depended_cell2.row != -1 && depended_cell2.col != -1 {
                     app.sheets[app.current_sheet_index].sheet.data[depended_cell2.row as usize][depended_cell2.col as usize].dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
-                    app.sheets[app.current_sheet_index].sheet.data[depended_cell2.row as usize][depended_cell2.col as usize].dependencies.insert((col as i32 * 1000 + row as i32));
+                    app.sheets[app.current_sheet_index].sheet.data[depended_cell2.row as usize][depended_cell2.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
                 }
 
                 sheet_functions::remove_dependency(&CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
@@ -67,7 +64,7 @@ pub fn paste(app: &mut SpreadsheetApp){
                 sheet_functions::change_dependecy_set(&mut new_cell1, &mut app.sheets[app.current_sheet_index].sheet, true);
                 let mut new_cell2=old_cell1.clone();
                 sheet_functions::change_dependecy_set(&mut new_cell2, &mut app.sheets[app.current_sheet_index].sheet, false);
-                sheet_functions::update_dependencies(old_cell1.clone(), old_row, old_col, row as i16, col as i16, &mut app.sheets[app.current_sheet_index].sheet);
+                sheet_functions::update_dependencies(old_row, old_col, row as i16, col as i16, &mut app.sheets[app.current_sheet_index].sheet);
                 for dependency in old_cell2.dependencies.clone() {
                     let dependency_row = dependency % 1000;
                     let dependency_col = dependency / 1000;
@@ -222,8 +219,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 });
             }
 
-            if ui.button("Clear").clicked() {
-                let old_data = app.sheets[app.current_sheet_index].sheet.data.clone();
+            if ui.button("Clear").clicked() { 
                 for row in &mut app.sheets[app.current_sheet_index].sheet.data {
                     for cell in row {
                         cell.value = 0;

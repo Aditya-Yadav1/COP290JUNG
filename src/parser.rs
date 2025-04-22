@@ -2,41 +2,15 @@ use std::thread;
 use std::time::Duration;
 use regex::Regex;
 use crate::sheet_functions;
-use crate::sheet_functions::col_name_to_col_num;
-use crate::sheet_functions::remove_dependency;
-use crate::sheet_functions::add_to_tree;
-use crate::sheet_functions::recalculate;
-use crate::sheet_functions::topological_sort;
+use crate::sheet_functions::col_name_to_col_num; 
 use crate::sheet_functions::CellInfo;
 use crate::calculate_functions::compute_cell;   
 use crate::sheet_functions::is_valid_cell;
-use crate::sheet_functions::Sheet;
-use std::collections::{HashMap, HashSet, VecDeque};
+use crate::sheet_functions::Sheet; 
 use std::time::Instant;
 use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
 use std::string::String;
-
-/*
-    = ->cell
-    + -> cell+cell
-    - ->cell-cell
-    * -> cell*cell
-    / -> cell/cell
-    S -> SUM
-    m -> MIN
-    M -> MAX
-    A -> AVG
-    D -> STDEV
-    Z -> sleep(cell)
-    X -> const op const,const , sleep(const)
-    p -> const+cell or cell+const
-    s -> const-cell or cell-const
-    u -> const*cell or cell*const
-    d -> cell/const
-    b -> const/cell
-    ^ -> string
-*/
 
 pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
     // function to get opcode for the case of int op cell or cell op int
@@ -60,18 +34,6 @@ pub fn get_op_code2(op_code: char) -> OpCode {
 }
 
 
-// pub fn get_op_code_rev(op_code: char) -> char {
-//     // function to get operation from opcode for the case of int op cell or cell op int
-//     match op_code {
-//         'p' => '+',
-//         's' => '-',
-//         'u' => '*',
-//         'd' => '/',
-//         'b' => '/',
-//         _ => '\0'
-//     }
-// }
-
 pub fn func_to_op_code(func: &str) -> OpCode {
     // function for getting opcode for the case of func(cell:cell)
     match func {
@@ -92,7 +54,7 @@ fn remove_space(command: &mut String) {
 pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32, sheet: &mut Sheet,print_enabled : &mut bool){
     let mut command = command.trim().to_string();
     let mut sleep_timer = 0;
-    let mut start_time = Instant::now();
+    let start_time = Instant::now();
     let re_scroll_to = Regex::new(r"^scroll_to([A-Z]+)(\d+)$").unwrap();
     let re_cell_eq_int_op_int = Regex::new(r"^([A-Z]+)(\d+)=(\d+)([+\-*/])(\d+)$").unwrap();
     let re_cell_eq_cell_op_cell = Regex::new(r"^([A-Z]+)(\d+)=([A-Z]+)(\d+)([+\-*/])([A-Z]+)(\d+)$").unwrap();
@@ -499,6 +461,6 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
     }
     else{
         *time = sleep_timer as f32;
-        thread::sleep(Duration::from_secs((sleep_timer as u64 - elapsed.as_secs())));
+        thread::sleep(Duration::from_secs(sleep_timer as u64 - elapsed.as_secs()));
     }
 }

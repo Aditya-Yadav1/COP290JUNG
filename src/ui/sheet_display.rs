@@ -164,8 +164,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                             &mut app.sheets[app.current_sheet_index].sheet,
                                             &mut true,
                                         );
-                                        
-                                        let new_cell = app.sheets[app.current_sheet_index].sheet.data[r as usize][c as usize].clone();
+                                         
                                         app.undo_stack.push(Action::Inserted {
                                             sheet_index: app.current_sheet_index,
                                             row: r as i16,
