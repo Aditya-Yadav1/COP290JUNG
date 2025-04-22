@@ -6,7 +6,7 @@ use serde::{Serialize, Deserialize};
 use crate::sheet_functions::{self,Sheet,Cell};
 use crate::ui::themes::{self,Theme};
 use crate::ui::themes::themes;
-
+use crate::ui::utils;
 use std::string::String;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -15,46 +15,51 @@ pub struct Sheets {
     pub name: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub enum Action {
-    CellEdit {
+    // NewSheet {
+    //     sheet: Sheets,
+    //     index: usize,
+    // },
+    // DeleteSheet {
+    //     sheet: Sheets,
+    //     index: usize,
+    // },
+    // ClearSheet {
+    //     sheet_index: usize,
+    //     old_data: Vec<Vec<Cell>>,
+    // },
+    Deleted {
         sheet_index: usize,
-        row: usize,
-        col: usize,
-        old_cell: Cell,
-        new_cell: Cell,
-        command: String,
+        row: i16,
+        col: i16,
+        deleted_cell: Cell,
     },
-    NewSheet {
-        sheet: Sheets,
-        index: usize,
+    Inserted {
+        sheet_index : usize,
+        row : i16,
+        col : i16,
+        previous_cell: Cell,
     },
-    DeleteSheet {
-        sheet: Sheets,
-        index: usize,
-    },
-    ClearSheet {
+    CutAction{
         sheet_index: usize,
-        old_data: Vec<Vec<Cell>>,
-    },
-    Cut {
-        sheet_index: usize,
-        row: usize,
-        col: usize,
-        old_cell: Cell,
-    },
-    Paste {
-        sheet_index: usize,
-        row: usize,
-        col: usize,
-        old_cell: Cell,
-        new_cell: Cell,
-        command: String,
-    },
+        row1: i16,
+        col1: i16,
+        previous_cell1: Cell,
+        row2: i16,
+        col2: i16,
+        previous_cell2: Cell,
+    },//1 -> cut from here , 2-> pasted here
     FindAndReplace {
         sheet_index: usize,
         changes: Vec<(usize, usize, Cell, Cell, String)>, // (row, col, old_cell, new_cell, command)
     },
+}
+
+#[derive(Clone,PartialEq)]
+pub enum CutCopy{
+    Cut,
+    Copied,
 }
 
 #[derive(Debug, PartialEq)]
@@ -93,9 +98,10 @@ pub struct SpreadsheetApp {
     pub new_sheet_name: String,
     pub undo_stack: Vec<Action>,
     pub redo_stack: Vec<Action>,
-    pub clipboard: Option<(Cell, String, usize, usize)>,
+    pub clipboard: Option<(Cell,CutCopy,i16,i16)>,
     pub find_text: String,
     pub replace_text: String,
+    pub cut_copied_cell: Option<(i16,i16)>,
 }
 
 impl SpreadsheetApp {
@@ -125,10 +131,12 @@ impl SpreadsheetApp {
             clipboard: None,
             find_text: String::new(),
             replace_text: String::new(),
+            cut_copied_cell : None,
         }
     }
 
     pub fn find_and_replace(&mut self) {
+        self.clear_clipboard();
         let mut sheet = &mut self.sheets[self.current_sheet_index].sheet;
         let mut changes = Vec::new();
         let find_text = self.find_text.clone();
@@ -196,221 +204,20 @@ impl SpreadsheetApp {
     }
 
     pub fn undo(&mut self) {
+        self.clear_clipboard();
         if let Some(action) = self.undo_stack.pop() {
             match action {
-                Action::CellEdit {
-                    sheet_index,
-                    row,
-                    col,
-                    old_cell,
-                    new_cell,
-                    command,
-                } => {
-                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
-                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
-                    let original_cmd = if old_cell.string.is_some() {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
-                    } else if old_cell.is_error {
-                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
-                    } else {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
-                    };
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut self.sheets[sheet_index].sheet,
-                    );
-                    parser::parse_command(
-                        &original_cmd,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut self.sheets[sheet_index].sheet,
-                        &mut true,
-                    );
-                    let new_cell1 = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    self.redo_stack.push(Action::CellEdit {
-                        sheet_index,
-                        row,
-                        col,
-                        old_cell: old_cell.clone(),
-                        new_cell: new_cell1,
-                        command: command.clone(),
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
+                Action::Inserted {sheet_index,row,col,previous_cell} => {
+                    utils::insert_undo(sheet_index, row, col, previous_cell,self);
                     self.status = "Undone cell edit".to_string();
                 }
-                Action::NewSheet { sheet, index } => {
-                    let removed_sheet = self.sheets.remove(index);
-                    self.current_sheet_index = self.current_sheet_index.min(self.sheets.len().saturating_sub(1));
-                    self.redo_stack.push(Action::NewSheet {
-                        sheet: removed_sheet,
-                        index,
-                    });
-                    self.status = "Undone new sheet".to_string();
-                }
-                Action::DeleteSheet { sheet, index } => {
-                    self.sheets.insert(index, sheet.clone());
-                    self.current_sheet_index = index;
-                    self.redo_stack.push(Action::DeleteSheet { sheet, index });
-                    self.status = "Undone delete sheet".to_string();
-                }
-                Action::ClearSheet { sheet_index, old_data } => {
-                    let new_data = self.sheets[sheet_index].sheet.data.clone();
-                    self.sheets[sheet_index].sheet.data = old_data;
-                    self.redo_stack.push(Action::ClearSheet {
-                        sheet_index,
-                        old_data: new_data,
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
-                    self.status = "Undone clear sheet".to_string();
-                }
-                Action::Cut {
-                    sheet_index,
-                    row,
-                    col,
-                    old_cell,
-                } => {
-                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
-                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
-                    let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    let original_cmd = if old_cell.string.is_some() {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
-                    } else if old_cell.is_error {
-                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
-                    } else {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
-                    };
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut self.sheets[sheet_index].sheet,
-                    );
-                    parser::parse_command(
-                        &original_cmd,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut self.sheets[sheet_index].sheet,
-                        &mut true,
-                    );
-                    self.redo_stack.push(Action::Cut {
-                        sheet_index,
-                        row,
-                        col,
-                        old_cell: new_cell,
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
+                Action::CutAction {sheet_index,row1,col1,previous_cell1,row2,col2,previous_cell2} => {
+                    utils::cut_undo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self);
                     self.status = "Undone cut".to_string();
                 }
-                Action::Paste {
-                    sheet_index,
-                    row,
-                    col,
-                    old_cell,
-                    new_cell,
-                    command,
-                } => {
-                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
-                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
-                    let original_cmd = if old_cell.string.is_some() {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
-                    } else if old_cell.is_error {
-                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
-                    } else {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
-                    };
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut self.sheets[sheet_index].sheet,
-                    );
-                    parser::parse_command(
-                        &original_cmd,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut self.sheets[sheet_index].sheet,
-                        &mut true,
-                    );
-                    let new_cell1 = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    self.redo_stack.push(Action::Paste {
-                        sheet_index,
-                        row,
-                        col,
-                        old_cell: old_cell.clone(),
-                        new_cell: new_cell1,
-                        command,
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
-                    self.status = "Undone paste".to_string();
+                Action::Deleted { sheet_index, row, col, deleted_cell } => {
+                    // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
+                    self.status = "Undone delete".to_string();
                 }
                 Action::FindAndReplace { sheet_index, changes } => {
                     let mut sheet = &mut self.sheets[sheet_index].sheet;
@@ -472,204 +279,20 @@ impl SpreadsheetApp {
     }
 
     pub fn redo(&mut self) {
+        self.clear_clipboard();
         if let Some(action) = self.redo_stack.pop() {
             match action {
-                Action::CellEdit {
-                    sheet_index,
-                    row,
-                    col,
-                    old_cell: _,
-                    new_cell: _,
-                    command,
-                } => {
-                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
-                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
-                    let old_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut self.sheets[sheet_index].sheet,
-                    );
-                    let mut print_enabled = true;
-                    parser::parse_command(
-                        &command,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut self.sheets[sheet_index].sheet,
-                        &mut print_enabled,
-                    );
-                    let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    self.undo_stack.push(Action::CellEdit {
-                        sheet_index,
-                        row,
-                        col,
-                        old_cell,
-                        new_cell,
-                        command,
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
+                Action::Inserted {sheet_index,row,col,previous_cell} => {
+                    utils::insert_undo(sheet_index, row, col, previous_cell,self);
                     self.status = "Redone cell edit".to_string();
                 }
-                Action::NewSheet { sheet, index } => {
-                    self.sheets.insert(index, sheet.clone());
-                    self.current_sheet_index = index;
-                    self.undo_stack.push(Action::NewSheet { sheet, index });
-                    self.status = "Redone new sheet".to_string();
-                }
-                Action::DeleteSheet { sheet, index } => {
-                    let removed_sheet = self.sheets.remove(index);
-                    self.current_sheet_index = self.current_sheet_index.min(self.sheets.len().saturating_sub(1));
-                    self.undo_stack.push(Action::DeleteSheet {
-                        sheet: removed_sheet,
-                        index,
-                    });
-                    self.status = "Redone delete sheet".to_string();
-                }
-                Action::ClearSheet { sheet_index, old_data } => {
-                    let new_data = self.sheets[sheet_index].sheet.data.clone();
-                    self.sheets[sheet_index].sheet.data = old_data;
-                    self.undo_stack.push(Action::ClearSheet {
-                        sheet_index,
-                        old_data: new_data,
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
-                    self.status = "Redone clear sheet".to_string();
-                }
-                Action::Cut {
-                    sheet_index,
-                    row,
-                    col,
-                    old_cell,
-                } => {
-                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
-                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
-                    let new_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut self.sheets[sheet_index].sheet,
-                    );
-                    parser::parse_command(
-                        &clear_cmd,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut self.sheets[sheet_index].sheet,
-                        &mut true,
-                    );
-                    self.undo_stack.push(Action::Cut {
-                        sheet_index,
-                        row,
-                        col,
-                        old_cell: new_cell,
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
+                Action::CutAction {sheet_index,row1,col1,previous_cell1,row2,col2,previous_cell2} => {
+                    utils::cut_undo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self);
                     self.status = "Redone cut".to_string();
                 }
-                Action::Paste {
-                    sheet_index,
-                    row,
-                    col,
-                    old_cell,
-                    new_cell,
-                    command,
-                } => {
-                    let sheet_rows = self.sheets[sheet_index].sheet.rows;
-                    let sheet_cols = self.sheets[sheet_index].sheet.cols;
-                    let prev_cell = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut self.sheets[sheet_index].sheet,
-                    );
-                    parser::parse_command(
-                        &command,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut self.sheets[sheet_index].sheet,
-                        &mut true,
-                    );
-                    let new_cell_after_redo = self.sheets[sheet_index].sheet.data[row][col].clone();
-                    self.undo_stack.push(Action::Paste {
-                        sheet_index,
-                        row,
-                        col,
-                        old_cell: prev_cell,
-                        new_cell: new_cell_after_redo,
-                        command,
-                    });
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
-                    self.status = "Redone paste".to_string();
+                Action::Deleted { sheet_index, row, col, deleted_cell } => {
+                    // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
+                    self.status = "Redone delete".to_string();
                 }
                 Action::FindAndReplace { sheet_index, changes } => {
                     let mut sheet = &mut self.sheets[sheet_index].sheet;
@@ -722,5 +345,10 @@ impl SpreadsheetApp {
         } else {
             self.status = "Nothing to redo".to_string();
         }
+    }
+
+    pub fn clear_clipboard(&mut self) {
+        self.clipboard = None;
+        self.cut_copied_cell = None;
     }
 }

@@ -31,13 +31,13 @@ pub enum OpCode {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct CellInfo {
     pub row: i16,
     pub col: i16,
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct Cell {
     pub value: i32,
     pub is_error: bool,
@@ -188,6 +188,28 @@ impl Sheet {
     }
 }
 
+impl Cell {
+    fn default() -> Self {
+        Cell {
+            value: 0,
+            is_error: false,
+            string: None,
+            op_code: NoConstraint,
+            cell1: CellInfo { row: -1, col: -1 },
+            cell2: CellInfo { row: -1, col: -1 },
+            dependencies: HashSet::new(),
+        }
+    }
+
+    fn delete_cell_value(&mut self) {
+        self.value = 0;
+        self.string = None;
+        self.is_error = false;
+        self.op_code = NoConstraint;
+        self.cell1 = CellInfo { row: -1, col: -1 };
+        self.cell2 = CellInfo { row: -1, col: -1 };
+    }
+}
 
 
 pub fn col_num_to_col_name(col_num: i32) -> String {
@@ -592,9 +614,8 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         }
     } 
     let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
-    if calc_error == true || calc_error1 == true {
-        cell.is_error = true;}
-    else if cell.op_code != String {
+    cell.is_error = calc_error || calc_error1;
+    if !cell.is_error && cell.op_code != String {
         cell.value  = ans;
         cell.string = None;
     }
@@ -611,3 +632,78 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
         recalculate(sheet, row as usize, col as usize, sleep_timer);
     }  
 } 
+
+
+pub fn update_dependencies(old_cell: Cell,old_cell_row: i16, old_cell_col: i16, new_cell_row: i16, new_cell_col: i16, sheet: &mut Sheet) {
+    //goes to dependency set of cells depending on old cell and removes the refrence to old cell and adds the refrence to new cell
+    let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    avl_tree.insert(new_cell_col as i32 * 1000 + new_cell_row as i32, 0);
+    let temp = CellInfo{ row: -1, col: -1};
+    add_to_tree(&mut avl_tree, CellInfo{ row: new_cell_row, col: new_cell_col }, sheet);
+
+    let sorted = topological_sort(&mut avl_tree, sheet);
+
+    for i in sorted.into_iter(){
+        let row = i % 1000;
+        let col = i / 1000;
+        if row == new_cell_row as i32 && col == new_cell_col as i32 {
+            continue;
+        }
+        else if sheet.data[row as usize][col as usize].op_code == Sum ||
+           sheet.data[row as usize][col as usize].op_code == Min ||
+           sheet.data[row as usize][col as usize].op_code == Max ||
+           sheet.data[row as usize][col as usize].op_code == Avg ||
+           sheet.data[row as usize][col as usize].op_code == Stdev {
+           recalculate(sheet, row as usize, col as usize, &mut 0);
+        }
+        else{
+            if sheet.data[row as usize][col as usize].cell1.row == old_cell_row &&
+               sheet.data[row as usize][col as usize].cell1.col == old_cell_col {
+                sheet.data[row as usize][col as usize].cell1 = CellInfo{ row: new_cell_row, col: new_cell_col };
+            }
+            if sheet.data[row as usize][col as usize].cell2.row == old_cell_row &&
+               sheet.data[row as usize][col as usize].cell2.col == old_cell_col {
+                sheet.data[row as usize][col as usize].cell2 = CellInfo{ row: new_cell_row, col: new_cell_col };
+            }
+        }
+    }
+}
+
+pub fn change_dependecy_set(new_cell: &mut Cell, sheet: &mut Sheet , del_range_dependencies: bool) {
+    //removes the range/ non range dependencies in the given dependency set
+    for i in new_cell.dependencies.clone() {
+        let row = i%1000;
+        let col = i/1000;
+        if (sheet.data[row as usize][col as usize].op_code == Sum ||
+           sheet.data[row as usize][col as usize].op_code == Min ||
+           sheet.data[row as usize][col as usize].op_code == Max ||
+           sheet.data[row as usize][col as usize].op_code == Avg ||
+           sheet.data[row as usize][col as usize].op_code == Stdev ) {
+            if del_range_dependencies{
+                new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
+            }
+            else{
+                recalculate(sheet, row as usize, col as usize, &mut 0);
+            }
+        }
+        else if !del_range_dependencies{
+            new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
+        }
+    }
+}
+
+
+pub fn recalculate_dependecy(curr_cell: CellInfo, sheet: &mut Sheet) {
+    let mut dependency_set = std::collections::HashMap::new();
+    dependency_set.insert(curr_cell.col as i32 * 1000 + curr_cell.row as i32, 0);
+    add_to_tree(&mut dependency_set, curr_cell.clone(), sheet);
+    let sorted = topological_sort(&mut dependency_set, sheet);
+    for i in sorted.into_iter(){
+        let row = i % 1000;
+        let col = i / 1000;
+        if row == curr_cell.row as i32 && col == curr_cell.col as i32 {
+            continue;
+        }
+        recalculate(sheet, row as usize, col as usize, &mut 0);
+    }
+}

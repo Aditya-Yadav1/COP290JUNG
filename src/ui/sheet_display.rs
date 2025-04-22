@@ -112,6 +112,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                     cell.value.to_string()
                                 };
                                 
+                                let is_cut = app.cut_copied_cell == Some((r as i16,c as i16));
                                 let is_sel = app.selected_cell == Some((r as usize, c as usize));
                                 
                                 let rect = ui.available_rect_before_wrap();
@@ -119,7 +120,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                 ui.painter().rect_filled(
                                     rect,
                                     0.0,
-                                    if is_sel { app.theme.selected_cell_bg } else { app.theme.cell_bg }
+                                    if is_sel || is_cut { app.theme.selected_cell_bg } else { app.theme.cell_bg }
                                 );
                                 
                                 ui.painter().rect_stroke(
@@ -144,6 +145,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                     );
                                     
                                     if edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                        app.clear_clipboard();
                                         let col_name = col_num_to_col_name(c);
                                         let row_str = (r + 1).to_string();
                                         let cmd = format!("{}{}={}", col_name, row_str, app.editing_value);
@@ -164,13 +166,11 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                         );
                                         
                                         let new_cell = app.sheets[app.current_sheet_index].sheet.data[r as usize][c as usize].clone();
-                                        app.undo_stack.push(Action::CellEdit {
+                                        app.undo_stack.push(Action::Inserted {
                                             sheet_index: app.current_sheet_index,
-                                            row: r as usize,
-                                            col: c as usize,
-                                            old_cell,
-                                            new_cell,
-                                            command: cmd.clone(),
+                                            row: r as i16,
+                                            col: c as i16,
+                                            previous_cell: old_cell,
                                         });
                                         app.redo_stack.clear();
                                         app.is_editing = false;
