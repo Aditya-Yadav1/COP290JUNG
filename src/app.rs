@@ -9,7 +9,7 @@ use crate::ui::utils::get_cell_formula;
 
 impl Default for SpreadsheetApp {
     fn default() -> Self {
-        let sheet = Sheet::new(20, 10);
+        let sheet = Sheet::new(20, 20);
         let sheets = vec![Sheets {
             sheet: sheet.clone(),
             name: String::from("Sheet 1"),
@@ -26,8 +26,8 @@ impl App for SpreadsheetApp {
             ctx.set_visuals(egui::Visuals::dark());
         }
         
-        let visible_rows = 20;
-        let visible_cols = 15;
+        let visible_rows = 18;
+        let visible_cols = 10;
         
         let mut entered = None;
 
@@ -201,15 +201,15 @@ impl App for SpreadsheetApp {
             self.mode = Mode::Insert;
             self.is_editing = false;
         }
-
+         
         if input.key_pressed(egui::Key::Escape) {
             self.mode = Mode::Normal;
             self.is_editing = false;
             self.editing_value.clear();
         }
 
-        let mut new_selection = self.selected_cell;
-        if let Some((r, c)) = self.selected_cell {
+        let mut new_selection = self.selected_cell.clone();
+        if let Some((r, c)) = self.selected_cell { 
             if input.key_pressed(egui::Key::ArrowUp) && r > 0 { new_selection = Some((r - 1, c)); }
             if input.key_pressed(egui::Key::ArrowDown) && r < self.sheets[self.current_sheet_index].sheet.rows as usize - 1 { new_selection = Some((r + 1, c)); }
             if input.key_pressed(egui::Key::ArrowLeft) && c > 0 { new_selection = Some((r, c - 1)); }
@@ -220,17 +220,35 @@ impl App for SpreadsheetApp {
                 self.is_editing = false;
                 self.editing_value.clear();
             }
-            
+        
             self.selected_cell = new_selection;
-            
+        
             if let Some((r, c)) = self.selected_cell {
-                if (r as i32) < self.row_start { self.row_start = r as i32;} 
-                else if (r as i32) >= self.row_start + visible_rows { self.row_start = (r as i32) - visible_rows + 1;}
-                if (c as i32) < self.col_start { self.col_start = c as i32;} 
-                else if (c as i32) >= self.col_start + visible_cols { self.col_start = (c as i32) - visible_cols + 1;}
-                
-                self.row_start = self.row_start.max(0).min(self.sheets[self.current_sheet_index].sheet.rows - visible_rows);
-                self.col_start = self.col_start.max(0).min(self.sheets[self.current_sheet_index].sheet.cols - visible_cols);
+                let sheet = &self.sheets[self.current_sheet_index].sheet;
+        
+                // Clamp scroll bounds to avoid negative ranges
+                let visible_rows = visible_rows.min(sheet.rows);
+                let visible_cols = visible_cols.min(sheet.cols);
+        
+                // Adjust scroll position to keep selected cell in view
+                if (r as i32) < self.row_start {
+                    self.row_start = r as i32;
+                } else if (r as i32) >= self.row_start + visible_rows {
+                    self.row_start = (r as i32) - visible_rows + 1;
+                }
+        
+                if (c as i32) < self.col_start {
+                    self.col_start = c as i32;
+                } else if (c as i32) >= self.col_start + visible_cols {
+                    self.col_start = (c as i32) - visible_cols + 1;
+                }
+        
+                // Don't allow scrolling beyond bounds (with saturating_sub)
+                let max_row_start = sheet.rows.saturating_sub(visible_rows);
+                let max_col_start = sheet.cols.saturating_sub(visible_cols);
+        
+                self.row_start = self.row_start.clamp(0, max_row_start);
+                self.col_start = self.col_start.clamp(0, max_col_start);
             }
         }
 
