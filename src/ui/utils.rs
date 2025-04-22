@@ -120,12 +120,12 @@ pub fn load_all_sheets(filename: &str) -> Vec<Sheets> {
     serde_json::from_reader(decoder).unwrap()
 }
 
-pub fn insert_undo(sheet_index: usize, row: i16, col: i16, previous_cell: Cell, app: &mut SpreadsheetApp) {
+pub fn insert_undo_redo(sheet_index: usize, row: i16, col: i16, previous_cell: Cell, app: &mut SpreadsheetApp , redo: bool) {
+    let curr_cell = app.sheets[sheet_index].sheet.data[row as usize][col as usize].clone();
     sheet_functions::remove_dependency(
         &CellInfo {row: row as i16,col: col as i16},
         &mut app.sheets[sheet_index].sheet,
     );
-    let curr_cell = app.sheets[sheet_index].sheet.data[row as usize][col as usize].clone();
     let old_cell = previous_cell.clone();
     if old_cell.cell1.row != -1 && old_cell.cell1.col != -1 {
         app.sheets[app.current_sheet_index].sheet.data[old_cell.cell1.row as usize][old_cell.cell1.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
@@ -135,17 +135,27 @@ pub fn insert_undo(sheet_index: usize, row: i16, col: i16, previous_cell: Cell, 
     }
     app.sheets[sheet_index].sheet.data[row as usize][col as usize] = old_cell;
 
-    app.redo_stack.push(Action::Inserted {
-        sheet_index,
-        row,
-        col,
-        previous_cell:curr_cell,
-    });
-
+    if !redo {
+        app.redo_stack.push(Action::Inserted {
+            sheet_index,
+            row,
+            col,
+            previous_cell:curr_cell,
+        });
+    } else {
+        app.undo_stack.push(Action::Inserted {
+            sheet_index,
+            row,
+            col,
+            previous_cell:curr_cell,
+        });
+    }
     sheet_functions::recalculate_dependecy(CellInfo {row: row as i16,col: col as i16}, &mut app.sheets[sheet_index].sheet);
 }
 
-pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, row2: i16, col2: i16, previous_cell2: Cell, app: &mut SpreadsheetApp) {
+pub fn cut_undo_redo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, row2: i16, col2: i16, previous_cell2: Cell, app: &mut SpreadsheetApp, redo: bool) {
+    let curr_cell1 = app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize].clone();
+    let curr_cell2 = app.sheets[sheet_index].sheet.data[row2 as usize][col2 as usize].clone();
     sheet_functions::remove_dependency(
         &CellInfo {row: row1 as i16,col: col1 as i16},
         &mut app.sheets[sheet_index].sheet,
@@ -154,8 +164,6 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
         &CellInfo {row: row2 as i16,col: col2 as i16},
         &mut app.sheets[sheet_index].sheet,
     );
-    let curr_cell1 = app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize].clone();
-    let curr_cell2 = app.sheets[sheet_index].sheet.data[row2 as usize][col2 as usize].clone();
     app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize] = previous_cell1;
     app.sheets[sheet_index].sheet.data[row2 as usize][col2 as usize] = previous_cell2;
     let cell1_1 = app.sheets[sheet_index].sheet.data[row1 as usize][col1 as usize].cell1.clone();
@@ -176,6 +184,7 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
     }
     sheet_functions::recalculate_dependecy(CellInfo {row: row1 as i16,col: col1 as i16}, &mut app.sheets[sheet_index].sheet);
     sheet_functions::recalculate_dependecy(CellInfo {row: row2 as i16,col: col2 as i16}, &mut app.sheets[sheet_index].sheet);
+    if !redo {
     app.redo_stack.push(Action::CutAction {
         sheet_index : sheet_index,
         row1 : row1,
@@ -184,7 +193,18 @@ pub fn cut_undo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, 
         row2 : row2,
         col2 : col2,
         previous_cell2 : curr_cell2,
-    });
+    });}
+    else {
+        app.undo_stack.push(Action::CutAction {
+            sheet_index : sheet_index,
+            row1 : row1,
+            col1 : col1,
+            previous_cell1 : curr_cell1,
+            row2 : row2,
+            col2 : col2,
+            previous_cell2 : curr_cell2,
+        });
+    }
 }
 
 pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
