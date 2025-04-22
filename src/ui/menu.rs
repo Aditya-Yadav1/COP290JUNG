@@ -1,10 +1,123 @@
-use crate::ui::app_impl::{Menu,Action,SpreadsheetApp};
+use crate::ui::app_impl::{Menu,Action,SpreadsheetApp,CutCopy};
 use crate::parser;
 use crate::ui::themes::themes;
 use crate::sheet_functions::{self,CellInfo,col_num_to_col_name,OpCode};
 use crate::sheet_functions::OpCode::*;
 use std::collections::HashSet;
 use crate::ui::utils::{load_all_sheets,save_all_sheets,convert_to_csv,open_csv};
+
+pub fn cut(app: &mut SpreadsheetApp){
+    if let Some((row, col)) = app.selected_cell {
+        let old_cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
+        app.clipboard = Some((old_cell, CutCopy::Cut, row as i16, col as i16));
+        app.cut_copied_cell = Some((row as i16, col as i16));
+        app.status = "Cut".to_string();
+    } else {
+        app.status = "No cell selected".to_string();
+    }
+}
+
+pub fn copy(app: &mut SpreadsheetApp){
+    if let Some((row, col)) = app.selected_cell {
+        let mut cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
+        cell.dependencies = HashSet::new();
+        cell.cell1 = CellInfo { row: -1, col: -1 };
+        cell.cell2 = CellInfo { row: -1, col: -1 };
+        cell.op_code = NoConstraint;
+        app.clipboard = Some((cell, CutCopy::Copied, row as i16, col as i16));
+        app.cut_copied_cell = Some((row as i16, col as i16));
+        app.status = "Copied".to_string();
+    } else {
+        app.status = "No cell selected".to_string();
+    }
+}
+
+pub fn paste(app: &mut SpreadsheetApp){
+    if let Some((row, col)) = app.selected_cell {
+        if let Some((cell, cut_copy, old_row, old_col)) = app.clipboard.clone() {
+            let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
+            let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;
+            let old_cell1 = app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].clone();
+            let old_cell2 = app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize].clone();
+
+            if cut_copy == CutCopy::Cut {
+                let mut new_cell1=old_cell1.clone();
+                new_cell1.value = 0;
+                new_cell1.string = None;
+                new_cell1.is_error = false;
+                new_cell1.op_code = NoConstraint;
+                new_cell1.cell1 = CellInfo { row: -1, col: -1 };
+                new_cell1.cell2 = CellInfo { row: -1, col: -1 };
+                let depended_cell1=app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].cell1.clone();
+                let depended_cell2=app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].cell2.clone();
+                
+                if depended_cell1.row != -1 && depended_cell1.col != -1 {
+                    app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
+                    app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.insert((col as i32 * 1000 + row as i32));
+                }
+                if depended_cell2.row != -1 && depended_cell2.col != -1 {
+                    app.sheets[app.current_sheet_index].sheet.data[depended_cell2.row as usize][depended_cell2.col as usize].dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
+                    app.sheets[app.current_sheet_index].sheet.data[depended_cell2.row as usize][depended_cell2.col as usize].dependencies.insert((col as i32 * 1000 + row as i32));
+                }
+
+                sheet_functions::remove_dependency(&CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
+                
+                
+                app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize] = new_cell1.clone();
+                sheet_functions::change_dependecy_set(&mut new_cell1, &mut app.sheets[app.current_sheet_index].sheet, true);
+                let mut new_cell2=old_cell1.clone();
+                sheet_functions::change_dependecy_set(&mut new_cell2, &mut app.sheets[app.current_sheet_index].sheet, false);
+                sheet_functions::update_dependencies(old_cell1.clone(), old_row, old_col, row as i16, col as i16, &mut app.sheets[app.current_sheet_index].sheet);
+                for dependency in old_cell2.dependencies.clone() {
+                    let dependency_row = dependency % 1000;
+                    let dependency_col = dependency / 1000;
+                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].value=0;
+                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].is_error=true;
+                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].string=None;
+                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].op_code=NoConstraint;
+                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].cell1 = CellInfo { row: -1, col: -1 };
+                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].cell2 = CellInfo { row: -1, col: -1 };
+                    sheet_functions::remove_dependency(&CellInfo { row: dependency_row as i16, col: dependency_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
+                }
+                app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize] = new_cell2;
+                app.redo_stack.clear();
+                app.undo_stack.push(Action::CutAction {
+                    sheet_index: app.current_sheet_index,
+                    row1: old_row as i16,
+                    col1: old_col as i16,
+                    previous_cell1: old_cell1.clone(),
+                    row2: row as i16,
+                    col2: col as i16,
+                    previous_cell2: old_cell2.clone(),
+                });
+                app.clipboard = None;
+            }
+            if cut_copy == CutCopy::Copied {
+                let mut new_cell=cell.clone();
+                new_cell.dependencies = old_cell2.dependencies.clone();
+                app.sheets[app.current_sheet_index].sheet.data[row][col] = new_cell.clone();
+                for dependency in new_cell.dependencies {
+                    let dependency_row = dependency % 1000;
+                    let dependency_col = dependency / 1000;
+                    sheet_functions::recalculate(&mut app.sheets[app.current_sheet_index].sheet, dependency_row as usize, dependency_col as usize, &mut 0);
+                }
+                app.redo_stack.clear();
+                app.undo_stack.push(Action::Inserted{
+                    sheet_index: app.current_sheet_index,
+                    row: row as i16,
+                    col: col as i16,
+                    previous_cell: old_cell2.clone(),
+                });
+            }
+            app.cut_copied_cell = None;
+            app.status = "Pasted".to_string();
+        } else {
+            app.status = "Nothing to paste".to_string();
+        }
+    } else {
+        app.status = "No cell selected".to_string();
+    }
+}
 
 pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::Ui)->egui::CollapsingResponse<()>{
     egui::CollapsingHeader::new("Menu")
@@ -121,153 +234,24 @@ pub fn show_menu(app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egui::U
                         cell.dependencies = HashSet::new();
                     }
                 }
-                app.undo_stack.push(Action::ClearSheet {
-                    sheet_index: app.current_sheet_index,
-                    old_data,
-                });
+                // app.undo_stack.push(Action::ClearSheet {
+                //     sheet_index: app.current_sheet_index,
+                //     old_data,
+                // });
                 app.redo_stack.clear();
                 app.status = "Cleared".to_string();
             }
 
             if ui.button("Cut").clicked() {
-                if let Some((row, col)) = app.selected_cell {
-                    let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
-                    let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;
-                    let old_cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
-                    let command = if old_cell.string.is_some() {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
-                    } else if old_cell.is_error {
-                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
-                    } else {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
-                    };
-                    app.clipboard = Some((old_cell.clone(), command, row, col));
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut app.sheets[app.current_sheet_index].sheet,
-                    );
-                    let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
-                    parser::parse_command(
-                        &clear_cmd,
-                        &mut app.row_start,
-                        &mut app.col_start,
-                        &mut app.time,
-                        &mut app.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut app.sheets[app.current_sheet_index].sheet,
-                        &mut true,
-                    );
-                    app.undo_stack.push(Action::Cut {
-                        sheet_index: app.current_sheet_index,
-                        row,
-                        col,
-                        old_cell,
-                    });
-                    app.redo_stack.clear();
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &app.sheets[app.current_sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut app.sheets[app.current_sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut app.timer,
-                        );
-                    }
-                    app.status = "Cut".to_string();
-                } else {
-                    app.status = "No cell selected".to_string();
-                }
+                cut(app);
             }
 
             if ui.button("Copy").clicked() {
-                if let Some((row, col)) = app.selected_cell {
-                    let cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
-                    let command = if cell.string.is_some() {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, cell.string.as_ref().unwrap())
-                    } else if cell.is_error {
-                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
-                    } else {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, cell.value)
-                    };
-                    app.clipboard = Some((cell, command, row, col));
-                    app.status = "Copied".to_string();
-                } else {
-                    app.status = "No cell selected".to_string();
-                }
+                copy(app);
             }
 
             if ui.button("Paste").clicked() {
-                if let Some((row, col)) = app.selected_cell {
-                    if let Some((cell, command, src_row, src_col)) = app.clipboard.clone() {
-                        let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
-                        let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;
-                        let old_cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
-                        sheet_functions::remove_dependency(
-                            &CellInfo {
-                                row: row as i16,
-                                col: col as i16,
-                            },
-                            &mut app.sheets[app.current_sheet_index].sheet,
-                        );
-                        let content = if let Some(s) = &cell.string {
-                            s.clone()
-                        } else if cell.is_error {
-                            "Err".to_string()
-                        } else {
-                            cell.value.to_string()
-                        };
-                        let paste_cmd = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, content);
-                        parser::parse_command(
-                            &paste_cmd,
-                            &mut app.row_start,
-                            &mut app.col_start,
-                            &mut app.time,
-                            &mut app.status,
-                            &sheet_rows,
-                            &sheet_cols,
-                            &mut app.sheets[app.current_sheet_index].sheet,
-                            &mut true,
-                        );
-                        let new_cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
-                        app.undo_stack.push(Action::Paste {
-                            sheet_index: app.current_sheet_index,
-                            row,
-                            col,
-                            old_cell,
-                            new_cell,
-                            command: paste_cmd,
-                        });
-                        app.redo_stack.clear();
-                        let sorted = sheet_functions::topological_sort(
-                            &mut std::collections::HashMap::new(),
-                            &app.sheets[app.current_sheet_index].sheet,
-                        );
-                        for i in sorted {
-                            let r = i % 1000;
-                            let c = i / 1000;
-                            sheet_functions::recalculate(
-                                &mut app.sheets[app.current_sheet_index].sheet,
-                                r as usize,
-                                c as usize,
-                                &mut app.timer,
-                            );
-                        }
-                        app.status = "Pasted".to_string();
-                    } else {
-                        app.status = "Nothing to paste".to_string();
-                    }
-                } else {
-                    app.status = "No cell selected".to_string();
-                }
+                paste(app);
             }
 
             if ui.button("Undo").clicked() {

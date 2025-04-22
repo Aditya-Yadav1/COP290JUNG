@@ -1,0 +1,47 @@
+->Cut
+   Highlight cell , copy to clipboard
+   If pasted {
+    delete contents of this cell
+    updae the dependents to the new cell
+   }
+   if something else cut/copied/value_changed{
+    clear clipboard
+   }
+
+->Copy
+    Highlight cell , copy to clipboard
+    if pasted {
+        paste
+    }
+    if something else cut/copied/value_changed{
+        clear clipboard
+    }
+
+->paste
+    if clipboard empty{
+        do nothing
+    }
+    if clipbaord has cut value{
+        delete the cut value from specified row,clipboard
+        insert the cut value to pasted thing
+        update the dependents to the new cell :{
+            if range function -> dont update
+        }
+    }
+    if clipbaord has copied value{
+        paste the cell value without hash set
+    }
+    
+-> undo : {
+    if undo stack empty{
+        do nothing
+    }
+    if undo stack not empty{
+        pop the top of the stack
+in case of cut :
+    deleted, inserted side by side
+    update the dependents to the new cell
+    }
+in case of paste:
+    old  pasted cell replaced , bring back old one
+}

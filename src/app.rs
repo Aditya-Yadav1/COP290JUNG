@@ -43,9 +43,14 @@ impl App for SpreadsheetApp {
                 ui.label("Formula:");
                 let resp = ui.text_edit_singleline(&mut self.formula);
                 if resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    self.clear_clipboard();
                     entered = Some(self.formula.clone());
                     self.formula.clear();
                 }
+                ui.separator();
+                ui.label("Selected Cell:");
+                ui.label("oi deepak formula idhar display kara dena");
+                ui.separator();
             });
             menu::show_menu(self, ctx, ui);
         });
@@ -98,10 +103,6 @@ impl App for SpreadsheetApp {
                                                 self.sheets.push(sheet_struct.clone());
                                                 let new_index = self.sheets.len() - 1;
                                                 self.current_sheet_index = new_index;
-                                                self.undo_stack.push(Action::NewSheet {
-                                                    sheet: sheet_struct,
-                                                    index: new_index,
-                                                });
                                                 self.redo_stack.clear();
                                                 self.show_menu = Menu::None;
                                                 self.status = String::from("Sheet created successfully");
@@ -123,6 +124,9 @@ impl App for SpreadsheetApp {
                 }
                 ui.separator();
                 if ui.button("Delete Current Sheet").clicked() {
+                    self.undo_stack.clear();
+                    self.redo_stack.clear();
+                    self.clear_clipboard();
                     if self.sheets.len() > 0 {
                         self.show_menu = Menu::DeleteSheet;
                     } else {
@@ -134,10 +138,6 @@ impl App for SpreadsheetApp {
                         ui.label("Are you sure you want to delete this sheet?");
                         if ui.button("Delete").clicked() {
                             let sheet = self.sheets.remove(self.current_sheet_index);
-                            self.undo_stack.push(Action::DeleteSheet {
-                                sheet,
-                                index: self.current_sheet_index,
-                            });
                             self.redo_stack.clear();
                             if self.current_sheet_index >= self.sheets.len() {
                                 self.current_sheet_index = self.sheets.len().saturating_sub(1);
@@ -178,157 +178,32 @@ impl App for SpreadsheetApp {
         let visible_rows = 20;
         let visible_cols = 15;
         
-        if !self.is_editing {
-            if input.modifiers.ctrl && input.key_pressed(egui::Key::Z) {
-                self.undo();
-                ctx.request_repaint();
-            }
-            if input.modifiers.ctrl && input.key_pressed(egui::Key::Y) {
-                self.redo();
-                ctx.request_repaint();
-            }
-            if input.modifiers.ctrl && input.key_pressed(egui::Key::F) {
-                self.show_menu = Menu::FindAndReplace;
-                ctx.request_repaint();
-            }
-            if input.modifiers.ctrl && input.key_pressed(egui::Key::X) {
-                if let Some((row, col)) = self.selected_cell {
-                    let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
-                    let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
-                    let old_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                    let command = if old_cell.string.is_some() {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
-                    } else if old_cell.is_error {
-                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
-                    } else {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
-                    };
-                    self.clipboard = Some((old_cell.clone(), command, row, col));
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
-                        },
-                        &mut self.sheets[self.current_sheet_index].sheet,
-                    );
-                    let clear_cmd = format!("{}{}=0", col_num_to_col_name(col as i32), row + 1);
-                    parser::parse_command(
-                        &clear_cmd,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &sheet_rows,
-                        &sheet_cols,
-                        &mut self.sheets[self.current_sheet_index].sheet,
-                        &mut true,
-                    );
-                    self.undo_stack.push(Action::Cut {
-                        sheet_index: self.current_sheet_index,
-                        row,
-                        col,
-                        old_cell,
-                    });
-                    self.redo_stack.clear();
-                    let sorted = sheet_functions::topological_sort(
-                        &mut std::collections::HashMap::new(),
-                        &self.sheets[self.current_sheet_index].sheet,
-                    );
-                    for i in sorted {
-                        let r = i % 1000;
-                        let c = i / 1000;
-                        sheet_functions::recalculate(
-                            &mut self.sheets[self.current_sheet_index].sheet,
-                            r as usize,
-                            c as usize,
-                            &mut self.timer,
-                        );
-                    }
-                    self.status = "Cut".to_string();
-                } else {
-                    self.status = "No cell selected".to_string();
-                }
-            }
-            if input.modifiers.ctrl && input.key_pressed(egui::Key::C) {
-                if let Some((row, col)) = self.selected_cell {
-                    let cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                    let command = if cell.string.is_some() {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, cell.string.as_ref().unwrap())
-                    } else if cell.is_error {
-                        format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
-                    } else {
-                        format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, cell.value)
-                    };
-                    self.clipboard = Some((cell, command, row, col));
-                    self.status = "Copied".to_string();
-                } else {
-                    self.status = "No cell selected".to_string();
-                }
-            }
-            if input.modifiers.ctrl && input.key_pressed(egui::Key::V) {
-                if let Some((row, col)) = self.selected_cell {
-                    if let Some((cell, command, src_row, src_col)) = self.clipboard.clone() {
-                        let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
-                        let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
-                        let old_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                        sheet_functions::remove_dependency(
-                            &CellInfo {
-                                row: row as i16,
-                                col: col as i16,
-                            },
-                            &mut self.sheets[self.current_sheet_index].sheet,
-                        );
-                        let content = if let Some(s) = &cell.string {
-                            s.clone()
-                        } else if cell.is_error {
-                            "Err".to_string()
-                        } else {
-                            cell.value.to_string()
-                        };
-                        let paste_cmd = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, content);
-                        parser::parse_command(
-                            &paste_cmd,
-                            &mut self.row_start,
-                            &mut self.col_start,
-                            &mut self.time,
-                            &mut self.status,
-                            &sheet_rows,
-                            &sheet_cols,
-                            &mut self.sheets[self.current_sheet_index].sheet,
-                            &mut true,
-                        );
-                        let new_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                        self.undo_stack.push(Action::Paste {
-                            sheet_index: self.current_sheet_index,
-                            row,
-                            col,
-                            old_cell,
-                            new_cell,
-                            command: paste_cmd,
-                        });
-                        self.redo_stack.clear();
-                        let sorted = sheet_functions::topological_sort(
-                            &mut std::collections::HashMap::new(),
-                            &self.sheets[self.current_sheet_index].sheet,
-                        );
-                        for i in sorted {
-                            let r = i % 1000;
-                            let c = i / 1000;
-                            sheet_functions::recalculate(
-                                &mut self.sheets[self.current_sheet_index].sheet,
-                                r as usize,
-                                c as usize,
-                                &mut self.timer,
-                            );
-                        }
-                        self.status = "Pasted".to_string();
-                    } else {
-                        self.status = "Nothing to paste".to_string();
-                    }
-                } else {
-                    self.status = "No cell selected".to_string();
-                }
-            }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::Z) {
+            self.undo();
+            ctx.request_repaint();
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::Y) {
+            self.redo();
+            ctx.request_repaint();
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::F) {
+            self.show_menu = Menu::FindAndReplace;
+            ctx.request_repaint();
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::A) {
+            menu::copy(self);
+            self.status = "Copied".to_string();
+            ctx.request_repaint();
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::S) {
+            menu::paste(self);
+            self.status = "Pasted".to_string();
+            ctx.request_repaint();
+        }
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::Q) {
+            menu::cut(self);
+            self.status = "Cut".to_string();
+            ctx.request_repaint();
         }
 
         if input.key_pressed(egui::Key::I) && self.mode == Mode::Normal {
@@ -408,13 +283,12 @@ impl App for SpreadsheetApp {
 
             if let Some((row, col, old_cell, command)) = cell_edit_action {
                 let new_cell = self.sheets[self.current_sheet_index].sheet.data[row][col].clone();
-                self.undo_stack.push(Action::CellEdit {
+               //ku
+                self.undo_stack.push(Action::Inserted {
                     sheet_index: self.current_sheet_index,
-                    row,
-                    col,
-                    old_cell,
-                    new_cell,
-                    command,
+                    row: row as i16,
+                    col: col as i16,
+                    previous_cell: old_cell,
                 });
                 self.redo_stack.clear();
             }
