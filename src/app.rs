@@ -1,16 +1,12 @@
 use eframe::{egui, App, Frame};
 use crate::{parser, sheet_functions}; 
-use crate::sheet_functions::{Sheet, col_num_to_col_name, recalculate, Cell, CellInfo, add_constraints};
-use crate::ui::utils::{convert_to_csv, open_csv, save_all_sheets, load_all_sheets};
-use std::collections::HashSet;
-use eframe::epaint::pos2;
-use crate::ui::themes::{THEMES, Theme};  
-use crate::sheet_functions::OpCode;
-use crate::sheet_functions::OpCode::*;
+use crate::sheet_functions::{Sheet, col_num_to_col_name}; 
 use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
-use crate::ui::sheet_display;
+use crate::ui::sheet_display; 
+use crate::ui::utils::get_cell_formula;
+
 
 impl Default for SpreadsheetApp {
     fn default() -> Self {
@@ -48,7 +44,16 @@ impl App for SpreadsheetApp {
                 }
                 ui.separator();
                 ui.label("Selected Cell:");
-                ui.label("oi deepak formula idhar display kara dena");
+                if let Some((r, c)) = self.selected_cell {
+                    let temp = get_cell_formula(
+                        r as i16,
+                        c as i16,
+                        &self.sheets[self.current_sheet_index].sheet.data[r][c],
+                    );
+                    ui.label(format!("Formula: {}", temp));
+                } else {
+                    ui.label("No cell is selected");
+                }
                 ui.separator();
             });
             menu::show_menu(self, ctx, ui);
