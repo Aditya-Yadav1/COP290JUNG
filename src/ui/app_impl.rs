@@ -6,6 +6,7 @@ use crate::ui::themes::Theme;
 use crate::ui::themes::THEMES;
 use crate::ui::utils;
 use std::string::String; 
+use crate::sheet_functions::OpCode;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Sheets {
@@ -169,10 +170,10 @@ impl SpreadsheetApp {
                     cell.value.to_string()
                 };
 
-                if cell_content == find_text {
+                if cell_content == find_text && (cell.op_code == OpCode::NoConstraint || cell.op_code == OpCode::String) {
                     let sheet1 = sheet.clone();
                     let old_cell = cell.clone();
-                    let command = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, replace_text);
+                    let command = format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, replace_text);
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -245,11 +246,11 @@ impl SpreadsheetApp {
                     let mut redo_changes = Vec::new();
                     for (row, col, old_cell, _, command) in changes {
                         let original_cmd = if old_cell.string.is_some() {
-                            format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
+                            format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
                         } else if old_cell.is_error {
                             format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
                         } else {
-                            format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, old_cell.value)
+                            format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, old_cell.value)
                         };
                         sheet_functions::remove_dependency(
                             &CellInfo {
