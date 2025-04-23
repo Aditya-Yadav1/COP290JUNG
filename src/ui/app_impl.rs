@@ -53,6 +53,14 @@ pub enum Action {
         sheet_index: usize,
         changes: Vec<(usize, usize, Cell, Cell, String)>, // (row, col, old_cell, new_cell, command)
     },
+    Sort{
+        sheet_index: usize,
+        changes: Vec<Vec<Cell>>,
+        row1: i32,
+        col1: i32,
+        row2: i32,
+        col2: i32,
+    }
 }
 
 #[derive(Clone,PartialEq)]
@@ -104,11 +112,11 @@ pub struct SpreadsheetApp {
     pub find_text: String,
     pub replace_text: String,
     pub cut_copied_cell: Option<(i16,i16)>,
-    pub plot_column1: String, // First column name (e.g., "A")
-    pub plot_column2: String, // Second column name (e.g., "B")
-    pub plot_row_start: String, // Start row (e.g., "1")
-    pub plot_row_end: String, // End row (e.g., "5")
-    pub show_plot: bool, // Whether to show the plot window
+    pub plot_column1: String, 
+    pub plot_column2: String, 
+    pub plot_row_start: String, 
+    pub plot_row_end: String, 
+    pub show_plot: bool, 
 }
 
 
@@ -158,22 +166,32 @@ impl SpreadsheetApp {
         let mut changes = Vec::new();
         let find_text = self.find_text.clone();
         let replace_text = self.replace_text.clone();
-
+        let mut is_num;
         for row in 0..sheet.rows as usize {
             for col in 0..sheet.cols as usize {
                 let cell = &sheet.data[row][col];
                 let cell_content = if let Some(s) = &cell.string {
+                    is_num=false;
                     s.clone()
                 } else if cell.is_error {
+                    is_num=false;
                     "Err".to_string()
                 } else {
+                    is_num=true;
                     cell.value.to_string()
                 };
 
                 if cell_content == find_text && (cell.op_code == OpCode::NoConstraint || cell.op_code == OpCode::String) {
+                    
                     let sheet1 = sheet.clone();
                     let old_cell = cell.clone();
-                    let command = format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, replace_text);
+                    let command;
+                    if !is_num{
+                        command = format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, replace_text);
+                    }
+                    else{
+                        command = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, replace_text);
+                    }
                     sheet_functions::remove_dependency(
                         &CellInfo {
                             row: row as i16,
@@ -293,6 +311,17 @@ impl SpreadsheetApp {
                     }
                     self.status = "Undone find and replace".to_string();
                 }
+                Action::Sort{sheet_index,changes,row1,col1,row2,col2} => {
+
+                    utils::sort_add_to_stack(sheet_index, col1, row1, col2, row2, self, true);
+                    for i in row1..(row2 + 1){
+                        for j in col1..(col2 + 1){
+                            
+                            self.sheets[sheet_index].sheet.data[i as usize][j as usize] = changes[(i - row1) as usize][(j - col1) as usize].clone();
+                        }
+                    }
+                    self.status = "Undone sort".to_string();
+                }
             }
         } else {
             self.status = "Nothing to undo".to_string();
@@ -365,6 +394,15 @@ impl SpreadsheetApp {
                         );
                     }
                     self.status = "Redone find and replace".to_string();
+                }
+                Action::Sort{sheet_index,changes,row1,col1,row2,col2} => {
+                    utils::sort_add_to_stack(sheet_index, col1, row1, col2, row2, self, false);
+                    for i in row1..(row2 + 1){
+                        for j in col1..(col2 + 1){
+                            self.sheets[sheet_index].sheet.data[i as usize][j as usize] = changes[(i - row1) as usize][(j - col1) as usize].clone();
+                        }
+                    }
+                    self.status = "Redone sort".to_string();
                 }
             }
         } else {

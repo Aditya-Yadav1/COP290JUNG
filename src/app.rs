@@ -1,11 +1,11 @@
 use eframe::{egui, App, Frame};
 use crate::{parser, sheet_functions}; 
-use crate::sheet_functions::{Sheet, col_num_to_col_name}; 
+use crate::sheet_functions::{Sheet, col_num_to_col_name,col_name_to_col_num, OpCode}; 
 use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
 use crate::ui::sheet_display; 
-use crate::ui::utils::get_cell_formula; 
+use crate::ui::utils::{get_cell_formula,sort_add_to_stack};
 
 
 
@@ -269,6 +269,7 @@ impl App for SpreadsheetApp {
             let sheet_rows = self.sheets[self.current_sheet_index].sheet.rows;
             let sheet_cols = self.sheets[self.current_sheet_index].sheet.cols;
             let re_cell_edit = regex::Regex::new(r"^([A-Z]+)(\d+)=.*$").unwrap();
+            let re_sort = regex::Regex::new(r"^SORT\(\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*([A-Z]+|\d+)\s*;\s*(asc|desc)\s*\)$").unwrap();
             let mut cell_edit_action = None;
 
             if let Some(caps) = re_cell_edit.captures(&cmd) {
@@ -281,6 +282,74 @@ impl App for SpreadsheetApp {
                         let old_cell = self.sheets[self.current_sheet_index].sheet.data[row as usize][col as usize].clone();
                         cell_edit_action = Some((row as usize, col as usize, old_cell, cmd.clone()));
                     }
+                }
+            }
+
+            if let Some(caps) = re_sort.captures(&cmd) {
+                let _col_name = caps.get(1).unwrap().as_str();
+                let row_str = caps.get(2).unwrap().as_str();
+                if let Ok(_row) = row_str.parse::<i32>() {
+                    let ref_col1 = caps.get(1).unwrap().as_str();
+                    let ref_row1: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
+                    let ref_col2 = caps.get(3).unwrap().as_str();
+                    let ref_row2: i32 = caps.get(4).unwrap().as_str().parse().unwrap();
+                    let sort_key = caps.get(5).unwrap().as_str(); 
+                    let sort_order = caps.get(6).unwrap().as_str();
+            
+                    let is_column = sort_key.chars().all(|c| c.is_ascii_alphabetic());
+                    let col1 = col_name_to_col_num(ref_col1);
+                    let row1 = ref_row1 - 1;
+                    let col2 = col_name_to_col_num(ref_col2);
+                    let row2 = ref_row2 - 1;
+            
+                    if (col2<col1) || (row2<row1){
+                        self.status = String::from("wrong range");
+                        self.time = 0.0;
+                        return;
+                    }
+                    if is_column {
+                        let sort_col = sheet_functions::col_name_to_col_num(sort_key);
+                        if sort_col > col2 || sort_col < col1 {
+                            self.status = String::from("sorted column out of range");
+                            self.time = 0.0;
+                            return;
+                        }
+                        for i in row1..=row2 + 1{
+                            if self.sheets[self.current_sheet_index].sheet.data[i as usize][sort_col as usize].string.is_some(){
+                                self.status = String::from("sorted column has string");
+                                self.time = 0.0;
+                                return;
+                            }
+                        }
+                    }
+                    else{
+                        let sort_row = sort_key.parse::<i32>().unwrap() - 1;
+                        if sort_row > row2 || sort_row < row1{
+                            self.status = String::from("sorted row out of range");
+                            self.time = 0.0;
+                            return;
+                        }
+                        for i in col1..=col2 + 1{
+                            if self.sheets[self.current_sheet_index].sheet.data[sort_row as usize][i as usize].string.is_some(){
+                                self.status = String::from("sorted row has string");
+                                self.time = 0.0;
+                                return;
+                            }
+                        }
+                    }
+                    for i in row1..=row2 + 1{
+                        for j in col1..=col2 + 1{
+                            if self.sheets[self.current_sheet_index].sheet.data[i as usize][j as usize].op_code != OpCode::NoConstraint && self.sheets[self.current_sheet_index].sheet.data[i as usize][j as usize].op_code != OpCode::String {
+                                self.status = String::from("range has constraints");
+                                self.time = 0.0;
+                                return;
+                            }
+                        }
+                    }
+                    sort_add_to_stack(self.current_sheet_index, col1, row1, col2, row2, self, false);
+                    sheet_functions::sort_sheet(&mut self.sheets[self.current_sheet_index].sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
+                    self.status = String::from("Sorted");
+                    self.time = 0.0;
                 }
             }
 

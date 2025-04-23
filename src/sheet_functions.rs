@@ -714,7 +714,7 @@ pub fn sort_sheet(sheet: &mut Sheet, col1: i32, row1: i32, col2: i32, row2: i32,
             vec.sort_by_key(|k| k[(col_num - col1 )as usize].clone().value);
         }
         else{
-            vec.sort_by_key(|k| k[(col_num - col1) as usize].clone().value);
+            vec.sort_by_key(|k| std::cmp::Reverse(k[(col_num - col1) as usize].clone().value));
         }
     }
     else{
@@ -730,7 +730,7 @@ pub fn sort_sheet(sheet: &mut Sheet, col1: i32, row1: i32, col2: i32, row2: i32,
             vec.sort_by_key(|k| k[(row_num - row1) as usize].clone().value);
         }
         else{
-            vec.sort_by_key(|k| k[(row_num - row1) as usize].clone().value);
+            vec.sort_by_key(|k| std::cmp::Reverse(k[(row_num - row1) as usize].clone().value));
         }
     }
     for i in row1..=row2{

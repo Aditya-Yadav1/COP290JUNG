@@ -1,6 +1,7 @@
 use crate::ui::app_impl::{Mode,Action,SpreadsheetApp}; 
 use crate::sheet_functions::col_num_to_col_name;
 use crate::parser;
+use egui:: Id;
  
 pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_rows: &i32,visible_cols: &i32)->egui::InnerResponse<()>{
     egui::CentralPanel::default().show(ctx, |ui| {
@@ -135,9 +136,15 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                         app.is_editing = true;
                                     }
                                     
+                                    let id = Id::new("cell_edit");
+                                    if app.is_editing {
+                                        ui.memory_mut(|mem| mem.request_focus(id));
+                                    }
+                                    
                                     let edit = ui.add_sized(
                                         cell_size,
                                         egui::TextEdit::singleline(&mut app.editing_value)
+                                            .id(id)
                                             .frame(false)
                                             .desired_width(cell_size.x)
                                             .text_color(app.theme.text_color)
@@ -149,7 +156,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                         let col_name = col_num_to_col_name(c);
                                         let row_str = (r + 1).to_string();
                                         let cmd = format!("{}{}={}", col_name, row_str, app.editing_value);
-                                        
+                                        app.selected_cell = None;
                                         let old_cell = app.sheets[app.current_sheet_index].sheet.data[r as usize][c as usize].clone();
                                         let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
                                         let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;

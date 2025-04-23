@@ -302,3 +302,20 @@ pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
     }
 }
 
+
+pub fn sort_add_to_stack(sheet_index: usize, col1: i32, row1: i32, col2: i32, row2: i32, app: &mut SpreadsheetApp, add_to_redo: bool) {
+    let mut changes = Vec::new();
+    for i in row1..(row2+1){
+        let mut temp = Vec :: new();
+        for j in col1..(col2+1){
+            temp.push(app.sheets[sheet_index].sheet.data[i as usize][j as usize].clone());
+        }
+        changes.push(temp);
+    }
+    if !add_to_redo{
+        app.undo_stack.push(Action::Sort{sheet_index,changes,row1,col1,row2,col2});
+    }
+    else{
+        app.redo_stack.push(Action::Sort{sheet_index,changes,row1,col1,row2,col2});
+    }
+}
