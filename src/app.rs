@@ -133,9 +133,10 @@ impl App for SpreadsheetApp {
                         ui.label("Are you sure you want to delete this sheet?");
                         if ui.button("Delete").clicked() { 
                             self.redo_stack.clear();
-                            if self.current_sheet_index >= self.sheets.len() {
-                                self.current_sheet_index = self.sheets.len().saturating_sub(1);
-                            }
+                            
+                            self.sheets.remove(self.current_sheet_index);
+                            self.current_sheet_index = self.sheets.len().saturating_sub(1);
+                        
                             self.show_menu = Menu::None;
                             self.status = String::from("Sheet deleted");
                         }
