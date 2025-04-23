@@ -7,12 +7,12 @@ mod ui;
 use ui::app_impl::{SpreadsheetApp,Sheets};
 use crate::sheet_functions::Sheet;
 use std::env;
-use egui::{FontData, FontDefinitions, FontFamily};
+use egui::{FontData, FontDefinitions, FontFamily};  
+
 
 fn setup_custom_fonts(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
-
-    // 1) Embed your main Unicode font first:
+ 
     fonts.font_data.insert(
         "noto_sans".to_owned(),
         FontData::from_static(include_bytes!("../assets/fonts/NotoSans-VariableFont_wdth,wght.ttf")),
@@ -23,17 +23,14 @@ fn setup_custom_fonts(ctx: &egui::Context) {
         "emoji".to_owned(),
         FontData::from_static(include_bytes!("../assets/fonts/Symbola-Emoji.ttf")),
     );
-
-    // 3) For proportional text: use NOTO_SANS first, then EMOJI as fallback
+ 
     {
         let prop = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
         prop.clear();
         prop.push("noto_sans".to_owned());
-        prop.push("emoji".to_owned());
-        // then you can let the rest (default egui fonts) follow automatically
+        prop.push("emoji".to_owned()); 
     }
-
-    // 4) Likewise for monospace if you need it:
+ 
     {
         let mono = fonts.families.get_mut(&FontFamily::Monospace).unwrap();
         mono.clear();
@@ -41,9 +38,7 @@ fn setup_custom_fonts(ctx: &egui::Context) {
         mono.push("emoji".to_owned());
     }
 
-    ctx.set_fonts(fonts);
-
-    // bump the body‐text size so color emojis look right 
+    ctx.set_fonts(fonts); 
 }
 
 
@@ -62,7 +57,9 @@ fn main() -> Result<(), eframe::Error> {
             "Rusty Spreadsheet GUI",
             options,
             Box::new(|cc| {
+                // setup_custom_fonts(&cc.egui_ctx);'setup_custom_fonts(&cc.egui_ctx, &FONTS[0]);
                 setup_custom_fonts(&cc.egui_ctx);
+                egui_extras::install_image_loaders(&cc.egui_ctx);
                 let sheet = Sheet::new(20, 20);
                 let sheets = vec![Sheets{sheet:sheet.clone(), name:String::from("Sheet 1")}];
                 Box::new(SpreadsheetApp::new(sheets))

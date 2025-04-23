@@ -283,6 +283,8 @@ use crate::sheet_functions::OpCode::*;
 use std::collections::HashSet;
 use crate::ui::utils::{load_all_sheets, save_all_sheets, convert_to_csv, open_csv};
 use egui_plot::{Line, PlotPoints, Plot};
+use crate::ui::fonts::FONTS;
+
 
 pub fn cut(app: &mut SpreadsheetApp) {
     if let Some((row, col)) = app.selected_cell {
@@ -431,10 +433,11 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                         });
                     });
                 }
-
+                
                 if app.show_menu == Menu::None && ui.button("Open").clicked() {
                     app.show_menu = Menu::Open;
                 }
+               
                 if app.show_menu == Menu::Open {
                     egui::Window::new("Open").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
                         ui.label("Enter filename:");    
@@ -614,7 +617,23 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.redo();
                     ctx.request_repaint();
                 }
-
+                if ui.button("Font").clicked() {
+                    app.show_menu = Menu::Font;
+                }
+                if app.show_menu == Menu::Font {
+                    egui::Window::new("Font Selection").resizable(false).collapsible(false).show(ctx, |ui| {
+                        ui.label("Select font:");
+                        for (index, font) in FONTS.iter().enumerate() {
+                            if ui.button(font.name).clicked() {
+                                if app.current_font_index != index {
+                                    app.current_font_index = index;
+                                    crate::ui::fonts::setup_custom_fonts(ctx, &FONTS[index]);
+                                }
+                                app.show_menu = Menu::None;
+                            }
+                        }
+                    });
+                }
                 if ui.button("Theme").clicked() {
                     app.show_menu = Menu::Theme;
                 }

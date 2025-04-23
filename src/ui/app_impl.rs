@@ -5,7 +5,7 @@ use crate::sheet_functions::{self,Sheet,Cell};
 use crate::ui::themes::Theme;
 use crate::ui::themes::THEMES;
 use crate::ui::utils;
-use std::string::String;
+use std::string::String; 
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Sheets {
@@ -70,6 +70,7 @@ pub enum Menu {
     Theme,
     NewSheet,
     DeleteSheet,
+    Font,
     FindAndReplace,
     PlotGraph,
     None,
@@ -80,6 +81,7 @@ pub struct SpreadsheetApp {
     pub current_sheet_index: usize,
     pub formula: String,
     pub status: String,
+    pub current_font_index: usize,
     pub mode: Mode,
     pub selected_cell: Option<(usize, usize)>,
     pub row_start: i32,
@@ -121,6 +123,7 @@ impl SpreadsheetApp {
             status: "ok".into(),
             mode: Mode::Normal,
             selected_cell: None,
+            current_font_index: 0,
             row_start: 0,
             col_start: 0,
             time: 0.0,
