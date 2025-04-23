@@ -24,6 +24,12 @@ pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
             .map(|cell| {
                 if cell.is_error {
                     "Err".to_string()
+                } else if let Some(ref s) = cell.string {
+                    if s.contains(',') {
+                        format!("\"{}\"", s)
+                    } else {
+                        s.clone()
+                    }
                 } else {
                     cell.value.to_string()
                 }
@@ -68,25 +74,38 @@ pub fn open_csv(filename: &str,app: &mut SpreadsheetApp)-> String {
             .split(',')
             .map(|value| {
                 let trimmed = value.trim();
-                match trimmed.parse::<i32>() {
-                    Ok(num) => Cell {
-                        value: num,
-                        string: None,
+                if trimmed.starts_with('"') && trimmed.ends_with('"') {
+                    let string_value = trimmed[1..trimmed.len()-1].to_string();
+                    Cell {
+                        value: 0,
+                        string: Some(string_value),
                         is_error: false,
-                        op_code: NoConstraint,
+                        op_code: String,
                         cell1: CellInfo { row: -1, col: -1 },
                         cell2: CellInfo { row: -1, col: -1 },
                         dependencies: HashSet::new()
-                    },
-                    Err(_) => {
-                        Cell {
-                            value: 0,
-                            string : None,
-                            is_error: true,
+                    }
+                } else {
+                    match trimmed.parse::<i32>() {
+                        Ok(num) => Cell {
+                            value: num,
+                            string: None,
+                            is_error: false,
                             op_code: NoConstraint,
                             cell1: CellInfo { row: -1, col: -1 },
                             cell2: CellInfo { row: -1, col: -1 },
                             dependencies: HashSet::new()
+                        },
+                        Err(_) => {
+                            Cell {
+                                value: 0,
+                                string: Some(trimmed.to_string()),
+                                is_error: false,
+                                op_code: String,
+                                cell1: CellInfo { row: -1, col: -1 },
+                                cell2: CellInfo { row: -1, col: -1 },
+                                dependencies: HashSet::new()
+                            }
                         }
                     }
                 }
@@ -110,14 +129,12 @@ pub fn open_csv(filename: &str,app: &mut SpreadsheetApp)-> String {
 
 pub fn save_all_sheets(sheets: &Vec<Sheets>, filename: &str) {
     let file = File::create(filename).unwrap();
-    let encoder = GzEncoder::new(file, Compression::default());
-    serde_json::to_writer_pretty(encoder, sheets).unwrap();   
+    serde_json::to_writer_pretty(file, sheets).unwrap();   
 }
 
 pub fn load_all_sheets(filename: &str) -> Vec<Sheets> {
     let file = File::open(filename).unwrap();
-    let decoder = GzDecoder::new(file);
-    serde_json::from_reader(decoder).unwrap()
+    serde_json::from_reader(file).unwrap()
 }
 
 pub fn insert_undo_redo(sheet_index: usize, row: i16, col: i16, previous_cell: Cell, app: &mut SpreadsheetApp , redo: bool) {

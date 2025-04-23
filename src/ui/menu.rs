@@ -328,7 +328,6 @@ pub fn paste(app: &mut SpreadsheetApp) {
                 new_cell1.cell2 = CellInfo { row: -1, col: -1 };
                 let depended_cell1 = app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].cell1.clone();
                 let depended_cell2 = app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].cell2.clone();
-                
                 if depended_cell1.row != -1 && depended_cell1.col != -1 {
                     app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
                     app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
@@ -341,9 +340,9 @@ pub fn paste(app: &mut SpreadsheetApp) {
                 sheet_functions::remove_dependency(&CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 
                 app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize] = new_cell1.clone();
-                sheet_functions::change_dependecy_set(&mut new_cell1, &mut app.sheets[app.current_sheet_index].sheet, true);
+                sheet_functions::change_dependecy_set(&mut new_cell1, &mut app.sheets[app.current_sheet_index].sheet, false , row as i16,col as i16,old_row as i16,old_col as i16);
                 let mut new_cell2 = old_cell1.clone();
-                sheet_functions::change_dependecy_set(&mut new_cell2, &mut app.sheets[app.current_sheet_index].sheet, false);
+                sheet_functions::change_dependecy_set(&mut new_cell2, &mut app.sheets[app.current_sheet_index].sheet, true, row as i16,col as i16,old_row as i16,old_col as i16);
                 sheet_functions::update_dependencies(old_row, old_col, row as i16, col as i16, &mut app.sheets[app.current_sheet_index].sheet);
                 for dependency in old_cell2.dependencies.clone() {
                     let dependency_row = dependency % 1000;
@@ -357,6 +356,8 @@ pub fn paste(app: &mut SpreadsheetApp) {
                     sheet_functions::remove_dependency(&CellInfo { row: dependency_row as i16, col: dependency_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 }
                 app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize] = new_cell2;
+                app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize] = new_cell1;
+                sheet_functions::recalculate_dependecy(CellInfo { row: old_row as i16, col: old_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 app.redo_stack.clear();
                 app.undo_stack.push(Action::CutAction {
                     sheet_index: app.current_sheet_index,

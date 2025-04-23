@@ -658,25 +658,32 @@ pub fn update_dependencies(old_cell_row: i16, old_cell_col: i16, new_cell_row: i
     }
 }
 
-pub fn change_dependecy_set(new_cell: &mut Cell, sheet: &mut Sheet , del_range_dependencies: bool) {
+pub fn change_dependecy_set(new_cell: &mut Cell, sheet: &mut Sheet , del_range_dependencies: bool ,change_to_row: i16, change_to_col: i16,current_row: i16, current_col: i16) {
     //removes the range/ non range dependencies in the given dependency set
     for i in new_cell.dependencies.clone() {
         let row = i%1000;
         let col = i/1000;
-        if sheet.data[row as usize][col as usize].op_code == Sum ||
+        if (sheet.data[row as usize][col as usize].op_code == Sum ||
            sheet.data[row as usize][col as usize].op_code == Min ||
            sheet.data[row as usize][col as usize].op_code == Max ||
            sheet.data[row as usize][col as usize].op_code == Avg ||
-           sheet.data[row as usize][col as usize].op_code == Stdev {
-            if del_range_dependencies{
+           sheet.data[row as usize][col as usize].op_code == Stdev) && del_range_dependencies {
                 new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
-            }
-            else{
-                recalculate(sheet, row as usize, col as usize, &mut 0);
-            }
         }
-        else if !del_range_dependencies{
+        else if !del_range_dependencies && !(sheet.data[row as usize][col as usize].op_code == Sum ||
+            sheet.data[row as usize][col as usize].op_code == Min ||
+            sheet.data[row as usize][col as usize].op_code == Max ||
+            sheet.data[row as usize][col as usize].op_code == Avg ||
+            sheet.data[row as usize][col as usize].op_code == Stdev){
             new_cell.dependencies.remove(&(col as i32 * 1000 + row as i32));
+            if sheet.data[row as usize][col as usize].cell1.row == current_row &&
+               sheet.data[row as usize][col as usize].cell1.col == current_col {
+                sheet.data[row as usize][col as usize].cell1 = CellInfo{ row: change_to_row, col: change_to_col };
+            }
+            if sheet.data[row as usize][col as usize].cell2.row == current_row &&
+               sheet.data[row as usize][col as usize].cell2.col == current_col {
+                sheet.data[row as usize][col as usize].cell2 = CellInfo{ row: change_to_row, col: change_to_col };
+            }
         }
     }
 }
