@@ -210,6 +210,7 @@ impl App for SpreadsheetApp {
             self.mode = Mode::Normal;
             self.selected_cell = None;
             self.is_editing = false;
+            self.show_menu = Menu::None;
             self.editing_value.clear();
         }
 
