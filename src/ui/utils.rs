@@ -6,9 +6,7 @@ use crate::sheet_functions::Cell;
 use crate::sheet_functions::CellInfo;
 use std::collections::HashSet;
 use crate::ui::app_impl::Sheets;
-use flate2::Compression;
-use flate2::write::GzEncoder;
-use flate2::read::GzDecoder;
+
 use crate::sheet_functions::{self};
 use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
