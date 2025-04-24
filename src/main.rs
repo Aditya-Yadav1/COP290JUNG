@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }];
                     Box::new(SpreadsheetApp::new(sheets))
                 }),
-            );
+            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
         }
     }
 
