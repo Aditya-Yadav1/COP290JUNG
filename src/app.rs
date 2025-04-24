@@ -1,6 +1,6 @@
 use eframe::{egui, App, Frame};
 use crate::{parser, sheet_functions}; 
-use crate::sheet_functions::{Sheet, col_num_to_col_name,col_name_to_col_num, OpCode}; 
+use crate::sheet_functions::{Sheet, col_num_to_col_name,col_name_to_col_num, OpCode,get_or_create_cell}; 
 use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
@@ -47,10 +47,11 @@ impl App for SpreadsheetApp {
                 ui.separator();
                 ui.label("Selected Cell:");
                 if let Some((r, c)) = self.selected_cell {
+                    let get_cell = get_or_create_cell(&mut self.sheets[self.current_sheet_index].sheet, r as i32, c as i32);
                     let temp = get_cell_formula(
                         r as i16,
                         c as i16,
-                        &self.sheets[self.current_sheet_index].sheet.data[r][c],
+                        get_cell,
                     );
                     ui.label(format!("Formula: {}", temp));
                 } else {
@@ -282,7 +283,7 @@ impl App for SpreadsheetApp {
                     let col = sheet_functions::col_name_to_col_num(col_name);
                     let row = row - 1;
                     if sheet_functions::is_valid_cell(row, col, sheet_rows, sheet_cols) {
-                        let old_cell = self.sheets[self.current_sheet_index].sheet.data[row as usize][col as usize].clone();
+                        let old_cell = get_or_create_cell(&mut self.sheets[self.current_sheet_index].sheet,row as i32,col as i32).clone();
                         cell_edit_action = Some((row as usize, col as usize, old_cell, cmd.clone()));
                     }
                 }

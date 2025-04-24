@@ -1,10 +1,11 @@
-use crate::sheet_functions::{CellInfo, col_num_to_col_name};
+use crate::sheet_functions::{CellInfo, col_num_to_col_name,get_or_create_cell};
 use crate::parser; 
 use serde::{Serialize, Deserialize};
 use crate::sheet_functions::{self,Sheet,Cell};
 use crate::ui::themes::Theme;
 use crate::ui::themes::THEMES;
 use crate::ui::utils;
+use std::cell;
 use std::string::String; 
 use crate::sheet_functions::OpCode;
 
@@ -179,9 +180,9 @@ impl SpreadsheetApp {
         let find_text = self.find_text.clone();
         let replace_text = self.replace_text.clone();
         let mut is_num;
-        for row in 0..sheet.rows as usize {
-            for col in 0..sheet.cols as usize {
-                let cell = &sheet.data[row][col];
+        let num_row=sheet.rows;
+        let num_col=sheet.cols;
+        for((row,col),cell) in sheet.data.clone().iter(){
                 let cell_content = if let Some(s) = &cell.string {
                     is_num=false;
                     s.clone()
@@ -195,19 +196,18 @@ impl SpreadsheetApp {
 
                 if cell_content == find_text && (cell.op_code == OpCode::NoConstraint || cell.op_code == OpCode::String) {
                     
-                    let sheet1 = sheet.clone();
                     let old_cell = cell.clone();
                     let command;
                     if !is_num{
-                        command = format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, replace_text);
+                        command = format!("{}{}=\"{}\"", col_num_to_col_name(*col as i32), row + 1, replace_text);
                     }
                     else{
-                        command = format!("{}{}={}", col_num_to_col_name(col as i32), row + 1, replace_text);
+                        command = format!("{}{}={}", col_num_to_col_name(*col as i32), row + 1, replace_text);
                     }
                     sheet_functions::remove_dependency(
                         &CellInfo {
-                            row: row as i16,
-                            col: col as i16,
+                            row: *row as i16,
+                            col: *col as i16,
                         },
                         sheet,
                     );
@@ -217,16 +217,16 @@ impl SpreadsheetApp {
                         &mut self.col_start,
                         &mut self.time,
                         &mut self.status,
-                        &sheet1.rows,
-                        &sheet1.cols,
+                        &num_row,
+                        &num_col,
                         & mut sheet,
                         &mut true,
                     );
-                    let new_cell = sheet.data[row][col].clone();
-                    changes.push((row, col, old_cell, new_cell, command));
+                    let new_cell = get_or_create_cell(sheet, *row as i32, *col as i32).clone();
+                    changes.push(( *row as usize, *col as usize, old_cell, new_cell, command));
                 }
             }
-        }
+        
 
         if !changes.is_empty() {
             let len = changes.len();
@@ -300,7 +300,7 @@ impl SpreadsheetApp {
                             &mut sheet,
                             &mut true,
                         );
-                        let new_cell_after_undo = sheet.data[row][col].clone();
+                        let new_cell_after_undo = get_or_create_cell(sheet, row as i32, col as i32).clone();
                         redo_changes.push((row, col, old_cell.clone(), new_cell_after_undo, command));
                     }
                     self.redo_stack.push(Action::FindAndReplace {
@@ -328,8 +328,8 @@ impl SpreadsheetApp {
                     utils::sort_add_to_stack(sheet_index, col1, row1, col2, row2, self, true);
                     for i in row1..(row2 + 1){
                         for j in col1..(col2 + 1){
-                            
-                            self.sheets[sheet_index].sheet.data[i as usize][j as usize] = changes[(i - row1) as usize][(j - col1) as usize].clone();
+                            let cell = get_or_create_cell(&mut self.sheets[self.current_sheet_index].sheet, i, j);
+                            *cell = changes[(i - row1) as usize][(j - col1) as usize].clone();
                         }
                     }
                     self.status = "Undone sort".to_string();
@@ -356,16 +356,12 @@ impl SpreadsheetApp {
                     utils::cut_undo_redo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self,true);
                     self.status = "Redone cut".to_string();
                 }
-                // Action::Deleted { sheet_index, row, col, deleted_cell } => {
-                //     // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
-                //     self.status = "Redone delete".to_string();
-                // }
                 Action::FindAndReplace { sheet_index, changes } => {
                     let mut sheet = &mut self.sheets[sheet_index].sheet;
                     let  sheet1 = sheet.clone();
                     let mut undo_changes = Vec::new();
                     for (row, col, _, _, command) in changes {
-                        let prev_cell = sheet.data[row][col].clone();
+                        let prev_cell = get_or_create_cell(sheet, row as i32, col as i32).clone();
                         sheet_functions::remove_dependency(
                             &CellInfo {
                                 row: row as i16,
@@ -384,7 +380,7 @@ impl SpreadsheetApp {
                             &mut sheet,
                             &mut true,
                         );
-                        let new_cell_after_redo = sheet.data[row][col].clone();
+                        let new_cell_after_redo = get_or_create_cell(sheet, row as i32, col as i32).clone();
                         undo_changes.push((row, col, prev_cell, new_cell_after_redo, command));
                     }
                     self.undo_stack.push(Action::FindAndReplace {
@@ -411,7 +407,8 @@ impl SpreadsheetApp {
                     utils::sort_add_to_stack(sheet_index, col1, row1, col2, row2, self, false);
                     for i in row1..(row2 + 1){
                         for j in col1..(col2 + 1){
-                            self.sheets[sheet_index].sheet.data[i as usize][j as usize] = changes[(i - row1) as usize][(j - col1) as usize].clone();
+                            let cell = get_or_create_cell(&mut self.sheets[sheet_index].sheet, i, j);
+                            *cell = changes[(i - row1) as usize][(j - col1) as usize].clone();
                         }
                     }
                     self.status = "Redone sort".to_string();

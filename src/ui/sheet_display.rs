@@ -1,5 +1,5 @@
 use crate::ui::app_impl::{Mode,Action,SpreadsheetApp}; 
-use crate::sheet_functions::col_num_to_col_name;
+use crate::sheet_functions::{col_num_to_col_name,get_or_create_cell};
 use crate::parser;
 use egui:: Id;
  
@@ -104,7 +104,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                             });
                             
                             for c in app.col_start..(app.col_start + visible_cols).min(app.sheets[app.current_sheet_index].sheet.cols) {
-                                let cell = &mut app.sheets[app.current_sheet_index].sheet.data[r as usize][c as usize];
+                                let cell = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,r as i32,c as i32);
                                 let display = if cell.string.is_some() {
                                     cell.string.as_ref().unwrap().clone()
                                 } else if cell.is_error {
@@ -156,7 +156,7 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                         let col_name = col_num_to_col_name(c);
                                         let row_str = (r + 1).to_string();
                                         let cmd = format!("{}{}={}", col_name, row_str, app.editing_value);
-                                        let old_cell = app.sheets[app.current_sheet_index].sheet.data[r as usize][c as usize].clone();
+                                        let old_cell = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,r as i32,c as i32).clone();
                                         let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
                                         let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;
                                         parser::parse_command(

@@ -1,6 +1,6 @@
 use crate::ui::app_impl::{Menu, Action, SpreadsheetApp, CutCopy};
 use crate::ui::themes::THEMES;
-use crate::sheet_functions::{self, CellInfo, col_name_to_col_num};
+use crate::sheet_functions::{self, CellInfo, col_name_to_col_num, get_or_create_cell};
 use crate::sheet_functions::OpCode;
 use OpCode :: *;
 use std::collections::HashSet;
@@ -12,7 +12,8 @@ use std::string::String ;
 
 pub fn cut(app: &mut SpreadsheetApp) {
     if let Some((row, col)) = app.selected_cell {
-        let old_cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
+        let cell = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet, row as i32, col as i32);
+        let old_cell =cell.clone();
         app.clipboard = Some((old_cell, CutCopy::Cut, row as i16, col as i16));
         app.cut_copied_cell = Some((row as i16, col as i16));
         app.status = "Cut".to_string();
@@ -23,7 +24,8 @@ pub fn cut(app: &mut SpreadsheetApp) {
 
 pub fn copy(app: &mut SpreadsheetApp) {
     if let Some((row, col)) = app.selected_cell {
-        let mut cell = app.sheets[app.current_sheet_index].sheet.data[row][col].clone();
+        let get_cell = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet, row as i32, col as i32);
+        let mut cell = get_cell.clone();
         cell.dependencies = HashSet::new();
         cell.cell1 = CellInfo { row: -1, col: -1 };
         cell.cell2 = CellInfo { row: -1, col: -1 };
@@ -39,8 +41,8 @@ pub fn copy(app: &mut SpreadsheetApp) {
 pub fn paste(app: &mut SpreadsheetApp) {
     if let Some((row, col)) = app.selected_cell {
         if let Some((cell, cut_copy, old_row, old_col)) = app.clipboard.clone() { 
-            let old_cell1 = app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].clone();
-            let old_cell2 = app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize].clone();
+            let old_cell1 = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet, old_row as i32, old_col as i32).clone();
+            let old_cell2 = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,row as i32,col as i32).clone();
 
             if cut_copy == CutCopy::Cut {
                 let mut new_cell1 = old_cell1.clone();
@@ -50,20 +52,20 @@ pub fn paste(app: &mut SpreadsheetApp) {
                 new_cell1.op_code = NoConstraint;
                 new_cell1.cell1 = CellInfo { row: -1, col: -1 };
                 new_cell1.cell2 = CellInfo { row: -1, col: -1 };
-                let depended_cell1 = app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].cell1.clone();
-                let depended_cell2 = app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize].cell2.clone();
+                let depended_cell1 = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,old_row as i32,old_col as i32).cell1.clone();
+                let depended_cell2 = get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,old_row as i32,old_col as i32).cell2.clone();
                 if depended_cell1.row != -1 && depended_cell1.col != -1 {
-                    app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
-                    app.sheets[app.current_sheet_index].sheet.data[depended_cell1.row as usize][depended_cell1.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,depended_cell1.row as i32,depended_cell1.col as i32).dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,depended_cell1.row as i32,depended_cell1.col as i32).dependencies.insert(col as i32 * 1000 + row as i32);
                 }
                 if depended_cell2.row != -1 && depended_cell2.col != -1 {
-                    app.sheets[app.current_sheet_index].sheet.data[depended_cell2.row as usize][depended_cell2.col as usize].dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
-                    app.sheets[app.current_sheet_index].sheet.data[depended_cell2.row as usize][depended_cell2.col as usize].dependencies.insert(col as i32 * 1000 + row as i32);
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,depended_cell2.row as i32,depended_cell2.col as i32).dependencies.remove(&(old_col as i32 * 1000 + old_row as i32));
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,depended_cell2.row as i32,depended_cell2.col as i32).dependencies.insert(col as i32 * 1000 + row as i32);
                 }
 
                 sheet_functions::remove_dependency(&CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 
-                app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize] = new_cell1.clone();
+                *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,old_row as i32,old_col as i32) = new_cell1.clone();
                 sheet_functions::change_dependecy_set(&mut new_cell1, &mut app.sheets[app.current_sheet_index].sheet, false , row as i16,col as i16,old_row as i16,old_col as i16);
                 let mut new_cell2 = old_cell1.clone();
                 sheet_functions::change_dependecy_set(&mut new_cell2, &mut app.sheets[app.current_sheet_index].sheet, true, row as i16,col as i16,old_row as i16,old_col as i16);
@@ -71,16 +73,16 @@ pub fn paste(app: &mut SpreadsheetApp) {
                 for dependency in old_cell2.dependencies.clone() {
                     let dependency_row = dependency % 1000;
                     let dependency_col = dependency / 1000;
-                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].value = 0;
-                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].is_error = true;
-                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].string = None;
-                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].op_code = NoConstraint;
-                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].cell1 = CellInfo { row: -1, col: -1 };
-                    app.sheets[app.current_sheet_index].sheet.data[dependency_row as usize][dependency_col as usize].cell2 = CellInfo { row: -1, col: -1 };
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,dependency_row as i32,dependency_col as i32).value = 0;
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,dependency_row as i32,dependency_col as i32).is_error = true;
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,dependency_row as i32,dependency_col as i32).string = None;
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,dependency_row as i32,dependency_col as i32).op_code = NoConstraint;
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,dependency_row as i32,dependency_col as i32).cell1 = CellInfo { row: -1, col: -1 };
+                    get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,dependency_row as i32,dependency_col as i32).cell2 = CellInfo { row: -1, col: -1 };
                     sheet_functions::remove_dependency(&CellInfo { row: dependency_row as i16, col: dependency_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 }
-                app.sheets[app.current_sheet_index].sheet.data[row as usize][col as usize] = new_cell2;
-                app.sheets[app.current_sheet_index].sheet.data[old_row as usize][old_col as usize] = new_cell1;
+                *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,row as i32,col as i32) = new_cell2;
+                *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,old_row as i32,old_col as i32) = new_cell1;
                 sheet_functions::recalculate_dependecy(CellInfo { row: old_row as i16, col: old_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 app.redo_stack.clear();
                 app.undo_stack.push(Action::CutAction {
@@ -97,7 +99,7 @@ pub fn paste(app: &mut SpreadsheetApp) {
             if cut_copy == CutCopy::Copied {
                 let mut new_cell = cell.clone();
                 new_cell.dependencies = old_cell2.dependencies.clone();
-                app.sheets[app.current_sheet_index].sheet.data[row][col] = new_cell.clone();
+                *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,row as i32,col as i32) = new_cell.clone();
                 sheet_functions::recalculate_dependecy(CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 app.redo_stack.clear();
                 app.undo_stack.push(Action::Inserted {
@@ -271,20 +273,20 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                         let col2 = sheet_functions::col_name_to_col_num(&app.plot_column2) as usize;
                         let row_start = app.plot_row_start.parse::<usize>().unwrap() - 1;
                         let row_end = app.plot_row_end.parse::<usize>().unwrap() - 1;
-                        let sheet = &app.sheets[app.current_sheet_index].sheet;
+                        let sheet = &mut app.sheets[app.current_sheet_index].sheet;
 
                         // Collect plot points
                         let mut points: Vec<[f64; 2]> = Vec::new();
                         for row in row_start..=row_end {
-                            let x = if sheet.data[row][col1].is_error {
+                            let x = if  get_or_create_cell(sheet,row as i32,col1 as i32).is_error {
                                 0.0
                             } else {
-                                sheet.data[row][col1].value as f64
+                                get_or_create_cell(sheet,row as i32,col1 as i32).value as f64
                             };
-                            let y = if sheet.data[row][col2].is_error {
+                            let y = if get_or_create_cell(sheet,row as i32,col2 as i32).is_error {
                                 0.0
                             } else {
-                                sheet.data[row][col2].value as f64
+                                get_or_create_cell(sheet,row as i32,col2 as i32).value as f64
                             };
                             points.push([x, y]);
                         }
@@ -306,18 +308,11 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }
 
                 if ui.button("Clear").clicked() { 
-                    for row in &mut app.sheets[app.current_sheet_index].sheet.data {
-                        for cell in row {
-                            cell.value = 0;
-                            cell.string = None;
-                            cell.is_error = false;
-                            cell.op_code = NoConstraint;
-                            cell.cell1 = CellInfo { row: -1, col: -1 };
-                            cell.cell2 = CellInfo { row: -1, col: -1 };
-                            cell.dependencies = HashSet::new();
-                        }
-                    }
+                    app.sheets[app.current_sheet_index].sheet.data.clear();
+                    app.sheets[app.current_sheet_index].sheet.buul.clear();
+                    app.sheets[app.current_sheet_index].sheet.tuup.clear();
                     app.redo_stack.clear();
+                    app.undo_stack.clear();
                     app.status = "Cleared".to_string();
                 }
 
