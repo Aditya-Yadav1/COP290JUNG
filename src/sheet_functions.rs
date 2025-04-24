@@ -453,6 +453,9 @@ pub fn add_constraints(curr_cell: CellInfo, cell1: CellInfo, cell2: CellInfo, op
     match op_code {
         NoConstraint => {
             ans = sheet.data[curr_cell.row as usize][curr_cell.col as usize].value;
+            if sheet.data[curr_cell.row as usize][curr_cell.col as usize].is_error == true {
+                calc_error = true;
+            }
             remove_dependency(&curr_cell, sheet);
             let cell = &mut sheet.data[curr_cell.row as usize][curr_cell.col as usize];
             cell.op_code = op_code;

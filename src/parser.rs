@@ -168,7 +168,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
                 if val2 == 0 {
                     calc_error=true;
                     value = -1;
-                    println!("Division by zero error {calc_error}");
+                    // println!("Division by zero error {calc_error}");
                 }
                 else{
                     calc_error = false;
