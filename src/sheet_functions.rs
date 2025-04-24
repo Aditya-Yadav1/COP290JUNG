@@ -743,7 +743,7 @@ pub fn sort_sheet(sheet: &mut Sheet, col1: i32, row1: i32, col2: i32, row2: i32,
     }
     for i in row1..=row2{
         for j in col1..=col2{
-            sheet.data[i as usize][j as usize] = vec[i as usize][j as usize].clone();
+            sheet.data[i as usize][j as usize] = vec[(i - row1)  as usize][(j - col1) as usize].clone();
         }
     }
 }

@@ -168,7 +168,6 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
                 if val2 == 0 {
                     calc_error=true;
                     value = -1;
-                    println!("Division by zero error {calc_error}");
                 }
                 else{
                     calc_error = false;
@@ -178,14 +177,14 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
 
             // let (ans, err) = compute_cell(Opcode::  , val1, val2, status);
             sheet.data[row as usize][col as usize].value = value;
-            sheet.data[row as usize][col as usize].is_error = calc_error;
             sheet.data[row as usize][col as usize].string = None;
-
+            
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = NoConstraint;
             sheet_functions::add_constraints(cell, cell1, cell2,op_code, sheet, status, &mut sleep_timer);
+            sheet.data[row as usize][col as usize].is_error = calc_error;
             *status = String::from("ok");
         } else {
             *status = String::from("Invalid cmd");

@@ -82,6 +82,7 @@ pub enum Menu {
     Font,
     FindAndReplace,
     PlotGraph,
+    Sort,
     None,
 }
 
@@ -117,6 +118,10 @@ pub struct SpreadsheetApp {
     pub plot_row_start: String, 
     pub plot_row_end: String, 
     pub show_plot: bool, 
+    pub sort_range_start: String,
+    pub sort_range_end: String,
+    pub sort_col_row : String,
+    pub ascending : bool
 }
 
 
@@ -157,6 +162,10 @@ impl SpreadsheetApp {
             plot_row_start: String::new(),
             plot_row_end: String::new(),
             show_plot: false,
+            sort_range_start: String::new(),
+            sort_range_end: String::new(),
+            sort_col_row: String::new(),
+            ascending: true,
         }
     }
 

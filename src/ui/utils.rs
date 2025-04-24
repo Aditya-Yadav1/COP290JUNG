@@ -6,7 +6,7 @@ use crate::sheet_functions::Cell;
 use crate::sheet_functions::CellInfo;
 use std::collections::HashSet;
 use crate::ui::app_impl::Sheets;
-
+use regex::Regex;
 use crate::sheet_functions::{self};
 use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
@@ -332,5 +332,100 @@ pub fn sort_add_to_stack(sheet_index: usize, col1: i32, row1: i32, col2: i32, ro
     }
     else{
         app.redo_stack.push(Action::Sort{sheet_index,changes,row1,col1,row2,col2});
+    }
+}
+
+pub fn sort_extension(col1: i32, row1: i32, col2: i32, row2: i32, sort_key: &str, is_column: bool, sort_order: &str, app: &mut SpreadsheetApp) {
+    if (col2<col1) || (row2<row1){
+        app.status = String::from("wrong range");
+        app.time = 0.0;
+        return;
+    }
+    if is_column {
+        let sort_col = sheet_functions::col_name_to_col_num(sort_key);
+        if sort_col > col2 || sort_col < col1 {
+            app.status = String::from("sorted column out of range");
+            app.time = 0.0;
+            return;
+        }
+        for i in row1..=row2 + 1{
+            if app.sheets[app.current_sheet_index].sheet.data[i as usize][sort_col as usize].string.is_some(){
+                app.status = String::from("sorted column has string");
+                app.time = 0.0;
+                return;
+            }
+        }
+    }
+    else{
+        let sort_row = sort_key.parse::<i32>().unwrap() - 1;
+        if sort_row > row2 || sort_row < row1{
+            app.status = String::from("sorted row out of range");
+            app.time = 0.0;
+            return;
+        }
+        for i in col1..=col2 + 1{
+            if app.sheets[app.current_sheet_index].sheet.data[sort_row as usize][i as usize].string.is_some(){
+                app.status = String::from("sorted row has string");
+                app.time = 0.0;
+                return;
+            }
+        }
+    }
+    for i in row1..=row2 + 1{
+        for j in col1..=col2 + 1{
+            if app.sheets[app.current_sheet_index].sheet.data[i as usize][j as usize].op_code != OpCode::NoConstraint && app.sheets[app.current_sheet_index].sheet.data[i as usize][j as usize].op_code != OpCode::String {
+                app.status = String::from("range has constraints");
+                app.time = 0.0;
+                return;
+            }
+        }
+    }
+    sort_add_to_stack(app.current_sheet_index, col1, row1, col2, row2, app, false);
+    sheet_functions::sort_sheet(&mut app.sheets[app.current_sheet_index].sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
+}
+
+pub fn sort_button_parser(app: &mut SpreadsheetApp,sort_asc : bool) {
+    let re_cell = Regex::new(r"^([A-Z]+)(\d+)$").unwrap();
+    if app.sort_col_row.is_empty() || app.sort_range_start.is_empty() || app.sort_range_end.is_empty() {
+        app.status = "Please enter required data".to_string();
+    } else {
+        let col1;
+        let row1;
+        let col2;
+        let row2;
+        println!("here");
+        if let Some(caps) = re_cell.captures(&app.sort_range_start.to_string()){
+            let col_in = caps.get(1).unwrap().as_str();
+            let row_in = caps.get(2).unwrap().as_str();
+            println!("{col_in}");
+            col1 = sheet_functions::col_name_to_col_num(col_in);
+            println!("here");
+            row1 = row_in.parse::<i32>().unwrap();
+            println!("here");
+        }
+        else{
+            app.status = "Invalid range start".to_string();
+            return;
+        }
+        if let Some(caps) = re_cell.captures(&app.sort_range_end.to_string()){
+            let col_in = caps.get(1).unwrap().as_str();
+            let row_in = caps.get(2).unwrap().as_str();
+            col2 = sheet_functions::col_name_to_col_num(col_in);
+            row2 = row_in.parse::<i32>().unwrap();
+        }
+        else{
+            app.status = "Invalid range end".to_string();
+            return;
+        }
+        let is_column =app.sort_col_row.chars().all(|c| c.is_ascii_alphabetic());
+        let sort_key = app.sort_col_row.clone();
+        println!("col1 : {} , row1: {} , col2 : {} , row2 : {} is_column:{is_column}  ", col1, row1, col2, row2);
+        sort_extension(col1, row1-1, col2, row2-1, &sort_key, is_column, if sort_asc {"asc"} else {"desc"}, app);
+       
+        app.sort_col_row = String::new();
+        app.sort_range_start = String::new();
+        app.sort_range_end = String::new();
+        app.status = "Sorting completed".to_string();
+        app.time = 0.0;
     }
 }

@@ -5,7 +5,7 @@ use std::string::String;
 use crate::ui::app_impl::*;
 use crate::ui::menu;
 use crate::ui::sheet_display; 
-use crate::ui::utils::{get_cell_formula,sort_add_to_stack};
+use crate::ui::utils::{get_cell_formula,sort_add_to_stack,sort_extension};
 
 
 
@@ -301,53 +301,8 @@ impl App for SpreadsheetApp {
                     let row1 = ref_row1 - 1;
                     let col2 = col_name_to_col_num(ref_col2);
                     let row2 = ref_row2 - 1;
-            
-                    if (col2<col1) || (row2<row1){
-                        self.status = String::from("wrong range");
-                        self.time = 0.0;
-                        return;
-                    }
-                    if is_column {
-                        let sort_col = sheet_functions::col_name_to_col_num(sort_key);
-                        if sort_col > col2 || sort_col < col1 {
-                            self.status = String::from("sorted column out of range");
-                            self.time = 0.0;
-                            return;
-                        }
-                        for i in row1..=row2 + 1{
-                            if self.sheets[self.current_sheet_index].sheet.data[i as usize][sort_col as usize].string.is_some(){
-                                self.status = String::from("sorted column has string");
-                                self.time = 0.0;
-                                return;
-                            }
-                        }
-                    }
-                    else{
-                        let sort_row = sort_key.parse::<i32>().unwrap() - 1;
-                        if sort_row > row2 || sort_row < row1{
-                            self.status = String::from("sorted row out of range");
-                            self.time = 0.0;
-                            return;
-                        }
-                        for i in col1..=col2 + 1{
-                            if self.sheets[self.current_sheet_index].sheet.data[sort_row as usize][i as usize].string.is_some(){
-                                self.status = String::from("sorted row has string");
-                                self.time = 0.0;
-                                return;
-                            }
-                        }
-                    }
-                    for i in row1..=row2 + 1{
-                        for j in col1..=col2 + 1{
-                            if self.sheets[self.current_sheet_index].sheet.data[i as usize][j as usize].op_code != OpCode::NoConstraint && self.sheets[self.current_sheet_index].sheet.data[i as usize][j as usize].op_code != OpCode::String {
-                                self.status = String::from("range has constraints");
-                                self.time = 0.0;
-                                return;
-                            }
-                        }
-                    }
-                    sort_add_to_stack(self.current_sheet_index, col1, row1, col2, row2, self, false);
-                    sheet_functions::sort_sheet(&mut self.sheets[self.current_sheet_index].sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
+                    println!("col1 : {} , row1: {} , col2 : {} , row2 : {} is_column:{is_column}  ", col1, row1, col2, row2);
+                    sort_extension(col1,row1,col2,row2,sort_key,is_column,sort_order,self);
                     self.status = String::from("Sorted");
                     self.time = 0.0;
                 }
