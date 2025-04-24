@@ -8,7 +8,11 @@ pub fn sum(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
     let mut a = 0;
     for i in val_row1..=val_row2 {
         for j in c1..=c2 {
-            a += sheet.data[i as usize][j as usize].value;
+            let value = sheet
+                .data
+                .get(&(i as i32, j as i32))
+                .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
+            a += value;
         }
     }
     a
@@ -18,9 +22,12 @@ pub fn min(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
     let mut a = i32::MAX;
     for i in val_row1..=val_row2 {
         for j in c1..=c2 {
-            let b = sheet.data[i as usize][j as usize].value;
-            if b < a {
-                a = b;
+            let value = sheet
+                .data
+                .get(&(i as i32, j as i32))
+                .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
+            if value < a {
+                a = value;
             }
         }
     }
@@ -31,9 +38,12 @@ pub fn max(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
     let mut a = i32::MIN;
     for i in val_row1..=val_row2 {
         for j in c1..=c2 {
-            let b = sheet.data[i as usize][j as usize].value;
-            if b > a {
-                a = b;
+            let value = sheet
+                .data
+                .get(&(i as i32, j as i32))
+                .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
+            if value > a {
+                a = value;
             }
         }
     }
@@ -47,20 +57,23 @@ pub fn avg(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
     let row1 = val_row1 as i32;
     let col1 = c1 as i32;
 
-    let count = ((row2 - row1 + 1)  * (col2 - col1 + 1)) as i32;
+    let count = ((row2 - row1 + 1) * (col2 - col1 + 1)) as i32;
     if count > 0 {
         total / count
     } else {
         -1
     }
 }
-
 pub fn stdev(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32 {
     let avg_val = avg(sheet, val_row1, c1, val_row2, c2);
     let mut total = 0;
     for i in val_row1..=val_row2 {
         for j in c1..=c2 {
-            let diff = sheet.data[i as usize][j as usize].value - avg_val;
+            let value = sheet
+                .data
+                .get(&(i as i32, j as i32))
+                .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
+            let diff = value - avg_val;
             total += diff * diff;
         }
     }
@@ -68,7 +81,7 @@ pub fn stdev(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i
     let row2 = val_row2 as i32;
     let col1 = c1 as i32;
     let col2 = c2 as i32;
-    let count = ((row2 - row1 + 1)  * (col2 - col1 + 1)) as i32;
+    let count = ((row2 - row1 + 1) * (col2 - col1 + 1)) as i32;
     let std = (total as f64 / count as f64).sqrt();
     std.round() as i32
 }
@@ -118,4 +131,4 @@ pub fn compute_range_func(sheet: &Sheet, op_code: OpCode, row1: i16, col1: i16, 
         _ => -1
     }
 
-}
+} 

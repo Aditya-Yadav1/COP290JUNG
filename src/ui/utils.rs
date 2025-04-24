@@ -17,110 +17,104 @@ use crate::sheet_functions::col_num_to_col_name;
 pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
     let save_file_name = format!("{}.csv", filename);
     let mut file = File::create(save_file_name).unwrap();
-    for row in &sheet.data {
-        let row_values : Vec<String>= row.iter()
-            .map(|cell| {
-                if cell.is_error {
-                    "Err".to_string()
-                } else if let Some(ref s) = cell.string {
-                    if s.contains(',') {
-                        format!("\"{}\"", s)
+
+    for row in 0..sheet.rows {
+        let row_values: Vec<String> = (0..sheet.cols)
+            .map(|col| {
+                if let Some(cell) = sheet.data.get(&(row, col)) {
+                    if cell.is_error {
+                        "Err".to_string()
+                    } else if let Some(ref s) = cell.string {
+                        if s.contains(',') {
+                            format!("\"{}\"", s)
+                        } else {
+                            s.clone()
+                        }
                     } else {
-                        s.clone()
+                        cell.value.to_string()
                     }
                 } else {
-                    cell.value.to_string()
+                    // Default value for cells not in the map
+                    "0".to_string()
                 }
             })
             .collect();
-        
+
         let line = row_values.join(",") + "\n";
         file.write_all(line.as_bytes()).unwrap();
     }
-    // file.flush().unwrap();
-    // file.close().unwrap();
 }
 
 
-pub fn open_csv(filename: &str,app: &mut SpreadsheetApp)-> String {
-    let row= 10;
-    let col= 10;
+pub fn open_csv(filename: &str, app: &mut SpreadsheetApp) -> String {
     app.new_sheet_name = filename.to_string();
-    app.create_new_sheet(row,col);
+    app.create_new_sheet(10, 10);
     let sheet = &mut app.sheets[app.current_sheet_index].sheet;
 
-    let status;
     let file = match File::open(filename) {
         Ok(f) => f,
-        Err(e) => {
-            status = format!("Failed to open file: {}", e);
-            return status; 
-        }
+        Err(e) => return format!("Failed to open file: {}", e),
     };
+
     let reader = BufReader::new(file);
     sheet.data.clear();
     let mut has_error = false;
-    for (_, line) in reader.lines().enumerate() {
+
+    for (row_idx, line) in reader.lines().enumerate() {
         let line = match line {
             Ok(l) => l,
             Err(_) => {
                 has_error = true;
-                break; 
+                break;
             }
         };
-        let row: Vec<Cell> = line
-            .split(',')
-            .map(|value| {
-                let trimmed = value.trim();
-                if trimmed.starts_with('"') && trimmed.ends_with('"') {
-                    let string_value = trimmed[1..trimmed.len()-1].to_string();
-                    Cell {
-                        value: 0,
-                        string: Some(string_value),
+
+        for (col_idx, value) in line.split(',').enumerate() {
+            let trimmed = value.trim();
+            let cell = if trimmed.starts_with('"') && trimmed.ends_with('"') {
+                Cell {
+                    value: 0,
+                    string: Some(trimmed[1..trimmed.len() - 1].to_string()),
+                    is_error: false,
+                    op_code: OpCode::String,
+                    cell1: CellInfo { row: -1, col: -1 },
+                    cell2: CellInfo { row: -1, col: -1 },
+                    dependencies: HashSet::new(),
+                }
+            } else {
+                match trimmed.parse::<i32>() {
+                    Ok(num) => Cell {
+                        value: num,
+                        string: None,
                         is_error: false,
-                        op_code: String,
+                        op_code: OpCode::NoConstraint,
                         cell1: CellInfo { row: -1, col: -1 },
                         cell2: CellInfo { row: -1, col: -1 },
-                        dependencies: HashSet::new()
-                    }
-                } else {
-                    match trimmed.parse::<i32>() {
-                        Ok(num) => Cell {
-                            value: num,
-                            string: None,
-                            is_error: false,
-                            op_code: NoConstraint,
-                            cell1: CellInfo { row: -1, col: -1 },
-                            cell2: CellInfo { row: -1, col: -1 },
-                            dependencies: HashSet::new()
-                        },
-                        Err(_) => {
-                            Cell {
-                                value: 0,
-                                string: Some(trimmed.to_string()),
-                                is_error: false,
-                                op_code: String,
-                                cell1: CellInfo { row: -1, col: -1 },
-                                cell2: CellInfo { row: -1, col: -1 },
-                                dependencies: HashSet::new()
-                            }
-                        }
-                    }
+                        dependencies: HashSet::new(),
+                    },
+                    Err(_) => Cell {
+                        value: 0,
+                        string: Some(trimmed.to_string()),
+                        is_error: false,
+                        op_code: OpCode::String,
+                        cell1: CellInfo { row: -1, col: -1 },
+                        cell2: CellInfo { row: -1, col: -1 },
+                        dependencies: HashSet::new(),
+                    },
                 }
-            })
-            .collect();
-        sheet.data.push(row);
-        sheet.rows = sheet.data.len() as i32;
-        sheet.cols = sheet.data[0].len() as i32;
+            };
+            sheet.data.insert((row_idx as i32, col_idx as i32), cell);
+        }
     }
+
+    sheet.rows = sheet.data.keys().map(|(r, _)| *r).max().unwrap_or(0) + 1;
+    sheet.cols = sheet.data.keys().map(|(_, c)| *c).max().unwrap_or(0) + 1;
 
     if has_error {
-        status = "error loading csv".to_string();
+        "error loading csv".to_string()
     } else {
-        status = "CSV loaded successfully".to_string();
+        "CSV loaded successfully".to_string()
     }
-
-    status
 }
 
 
