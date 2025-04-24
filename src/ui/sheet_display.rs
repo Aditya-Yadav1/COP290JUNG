@@ -156,7 +156,6 @@ pub fn show_spreadsheet(app: &mut SpreadsheetApp, ctx: &egui::Context,visible_ro
                                         let col_name = col_num_to_col_name(c);
                                         let row_str = (r + 1).to_string();
                                         let cmd = format!("{}{}={}", col_name, row_str, app.editing_value);
-                                        app.selected_cell = None;
                                         let old_cell = app.sheets[app.current_sheet_index].sheet.data[r as usize][c as usize].clone();
                                         let sheet_rows = app.sheets[app.current_sheet_index].sheet.rows;
                                         let sheet_cols = app.sheets[app.current_sheet_index].sheet.cols;

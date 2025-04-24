@@ -83,6 +83,7 @@ pub enum Menu {
     FindAndReplace,
     PlotGraph,
     Sort,
+    SelectCell,
     None,
 }
 
@@ -121,7 +122,8 @@ pub struct SpreadsheetApp {
     pub sort_range_start: String,
     pub sort_range_end: String,
     pub sort_col_row : String,
-    pub ascending : bool
+    pub ascending : bool,
+    pub input_select_cell : String,
 }
 
 
@@ -166,6 +168,7 @@ impl SpreadsheetApp {
             sort_range_end: String::new(),
             sort_col_row: String::new(),
             ascending: true,
+            input_select_cell: String::new(),
         }
     }
 

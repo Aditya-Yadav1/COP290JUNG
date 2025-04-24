@@ -1,11 +1,13 @@
 use crate::ui::app_impl::{Menu, Action, SpreadsheetApp, CutCopy};
 use crate::ui::themes::THEMES;
-use crate::sheet_functions::{self, CellInfo};
-use crate::sheet_functions::OpCode::*;
+use crate::sheet_functions::{self, CellInfo, col_name_to_col_num};
+use crate::sheet_functions::OpCode;
+use OpCode :: *;
 use std::collections::HashSet;
 use crate::ui::utils::{load_all_sheets, save_all_sheets, convert_to_csv, open_csv,sort_button_parser};
 use egui_plot::{Line, PlotPoints, Plot};
 use crate::ui::fonts::FONTS;
+use std::string::String ;
 
 
 pub fn cut(app: &mut SpreadsheetApp) {
@@ -360,6 +362,46 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 if ui.button("Theme").clicked() {
                     app.show_menu = Menu::Theme;
                 }
+                if ui.button("Scroll to").clicked() {
+                    app.show_menu = Menu::SelectCell;
+                }
+                if app.show_menu == Menu::SelectCell {
+                    egui::Window::new("select_cell").resizable(false).collapsible(false).show(ctx, |ui| {
+                        ui.label("Enter cell to scroll to:");
+                        let select_cell = ui.text_edit_singleline(&mut app.input_select_cell);
+                        ui.horizontal(|ui|{
+                        if ui.input(|i| i.key_pressed(egui::Key::Enter)) || ui.button("Scroll").clicked() {
+                            let re = regex::Regex::new(r"^([A-Z]+)(\d+)$").unwrap();
+                            if let Some(caps) = re.captures(&app.input_select_cell) {
+                                let col_name = caps.get(1).unwrap().as_str();
+                                let row_str = caps.get(2).unwrap().as_str();
+                                if let Ok(row) = row_str.parse::<i32>() {
+                                    let col = col_name_to_col_num(col_name);
+                                    let row = row - 1;
+                                    if sheet_functions::is_valid_cell(row, col, app.sheets[app.current_sheet_index].sheet.rows, app.sheets[app.current_sheet_index].sheet.cols) {
+                                        app.selected_cell = Some((row as usize, col as usize));
+                                        app.row_start = row as i32;
+                                        app.col_start = col as i32;
+                                        app.show_menu = Menu::None;
+                                        app.status = String::from("Ok");
+                                    } else {
+                                        app.status = String::from("Invalid cell");
+                                    }
+                                } else {
+                                    app.status = String::from("Invalid cell");
+                                }
+                            } else {
+                                app.status = String::from("Invalid cell");
+                            }
+                        }
+                        if ui.button("Cancel").clicked() {
+                            app.show_menu = Menu::None;
+                            app.status = String::from("Ok");
+                        }});
+                        
+                    });
+                }        
+
                 if app.show_menu == Menu::Theme {
                     egui::Window::new("Theme").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Select theme:");
@@ -382,7 +424,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                             ui.text_edit_singleline(&mut app.sort_range_start);
                             ui.label("Enter Range End:");
                             ui.text_edit_singleline(&mut app.sort_range_end);
-                            ui.label("Column:");
+                            ui.label("Sort by Column/Row:");
                             ui.text_edit_singleline(&mut app.sort_col_row);
                         });
                         ui.horizontal(|ui| {                           
