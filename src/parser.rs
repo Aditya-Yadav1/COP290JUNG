@@ -4,7 +4,7 @@ use regex::Regex;
 use crate::sheet_functions;
 use crate::sheet_functions::col_name_to_col_num; 
 use crate::sheet_functions::CellInfo;
-use crate::calculate_functions::compute_cell;   
+// use crate::calculate_functions::compute_cell;   
 use crate::sheet_functions::is_valid_cell;
 use crate::sheet_functions::Sheet; 
 use std::time::Instant;
