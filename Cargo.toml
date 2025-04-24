@@ -13,3 +13,8 @@ serde_json = "1.0"
 flate2 = "1.0"
 egui_extras = { version = "0.26", features = ["image"] }
 lazy_static = "1.4.0"
+
+[features]
+default = ["no_gui"]
+gui = []
+no_gui = []
