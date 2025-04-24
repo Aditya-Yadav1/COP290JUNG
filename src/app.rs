@@ -200,6 +200,9 @@ impl App for SpreadsheetApp {
             self.status = "Cut".to_string();
             ctx.request_repaint();
         }
+        if input.modifiers.alt && input.key_pressed(egui::Key::S){
+            self.show_menu = Menu:: SelectCell;
+        }
 
         if input.key_pressed(egui::Key::I) && self.mode == Mode::Normal {
             self.mode = Mode::Insert;
