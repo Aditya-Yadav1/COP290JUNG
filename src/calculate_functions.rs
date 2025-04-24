@@ -10,7 +10,7 @@ pub fn sum(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
         for j in c1..=c2 {
             let value = sheet
                 .data
-                .get(&(i as i32, j as i32))
+                .get(&(i as i16, j as i16))
                 .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
             a += value;
         }
@@ -24,7 +24,7 @@ pub fn min(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
         for j in c1..=c2 {
             let value = sheet
                 .data
-                .get(&(i as i32, j as i32))
+                .get(&(i as i16, j as i16))
                 .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
             if value < a {
                 a = value;
@@ -40,7 +40,7 @@ pub fn max(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
         for j in c1..=c2 {
             let value = sheet
                 .data
-                .get(&(i as i32, j as i32))
+                .get(&(i as i16, j as i16))
                 .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
             if value > a {
                 a = value;
@@ -71,7 +71,7 @@ pub fn stdev(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i
         for j in c1..=c2 {
             let value = sheet
                 .data
-                .get(&(i as i32, j as i32))
+                .get(&(i as i16, j as i16))
                 .map_or(0, |cell| cell.value); // Use 0 if the cell is not in the map
             let diff = value - avg_val;
             total += diff * diff;

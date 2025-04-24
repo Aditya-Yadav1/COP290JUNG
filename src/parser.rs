@@ -334,8 +334,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         
         let col = col_name_to_col_num(ref_col);
         let row = ref_row - 1; 
-        if is_valid_cell(row, col, *total_rows, *total_cols) { 
-            let cell_entry = get_or_create_cell(sheet, row, col);
+        if is_valid_cell(row, col, *total_rows, *total_cols) {  
             let cell_entry = get_or_create_cell(sheet, row, col);
             cell_entry.string = None;
             cell_entry.value = val1;
@@ -455,7 +454,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
                 return;
             }
             for i in row1..=row2 {
-                if let Some(cell) = sheet.data.get(&(i, sort_col)) {
+                if let Some(cell) = sheet.data.get(&(i as i16, sort_col as i16)) {
                     if cell.string.is_some() {
                         *status = String::from("sorted column has string");
                         *time = 0.0;
@@ -472,7 +471,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
                 return;
             }
             for i in col1..=col2{
-                if let Some(cell) = sheet.data.get(&(sort_row, i)) {
+                if let Some(cell) = sheet.data.get(&(sort_row as i16, i as i16)) {
                     if cell.string.is_some() {
                         *status = String::from("sorted row has string");
                         *time = 0.0;
@@ -483,7 +482,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         }
         for i in row1..=row2{
             for j in col1..=col2{
-                if let Some(cell) = sheet.data.get(&(i, j)) {
+                if let Some(cell) = sheet.data.get(&(i as i16, j as i16)) {
                     if cell.op_code != NoConstraint && cell.op_code != String {
                         *status = String::from("range has constraints");
                         *time = 0.0;
