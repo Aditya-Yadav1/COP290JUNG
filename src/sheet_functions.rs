@@ -205,7 +205,6 @@ impl Sheet {
 ///
 /// # Returns
 /// The alphabetical column name as a `String`.
-
 pub fn col_num_to_col_name(col_num: i32) -> String {
     let mut col_name = String::new();
     let mut col_num = col_num;
@@ -350,13 +349,12 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 let ref_cell = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
                 if ref_cell.is_error {
                     err = true;
-                }else {
-                    if ref_cell.string.is_some(){
-                        strval = ref_cell.string.as_ref().unwrap().clone();
-                    }else{ 
-                        val = ref_cell.value; 
-                    } 
-                }
+                }else if ref_cell.string.is_some(){
+                                       strval = ref_cell.string.as_ref().unwrap().clone();
+                                   }else{
+                                         val = ref_cell.value;
+                               }
+                
             }
             CellPlusCell | CellMinusCell | CellTimesCell | CellDivideCell => {
                 let (a_value, a_is_error, a_string) = {
@@ -424,14 +422,12 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
         if is_error2 == true {
             c.is_error = true;
         }
-        else {
-            if op_code == CellEqualsCell && string_value != "" {
-                c.string = Some(string_value.clone());
-            } else{
-                c.value  = new_value; 
-                c.string = None;
-            }
-        }
+        else if op_code == CellEqualsCell && string_value != "" {
+             c.string = Some(string_value.clone());
+         } else{
+             c.value  = new_value;
+             c.string = None;
+         }
     }
 }
 
@@ -443,7 +439,6 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
 ///
 /// # Returns
 /// A vector of cell keys in topological order.
-
 pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, sheet: &Sheet) -> Vec<i32> {
     let mut queue = std::collections::VecDeque::new();
     let mut result = Vec::new();

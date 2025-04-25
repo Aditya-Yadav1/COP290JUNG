@@ -9,6 +9,9 @@ use crate::ui::utils::{get_cell_formula,sort_add_to_stack,sort_extension};
 
 
 
+// use clonne
+
+
 impl Default for SpreadsheetApp {
     fn default() -> Self {
         let sheet = Sheet::new(20, 20);
