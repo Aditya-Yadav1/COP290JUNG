@@ -13,6 +13,7 @@ use crate::sheet_functions::OpCode::*;
 use crate::ui::app_impl::{Action,SpreadsheetApp};
 use std::string::String;
 use crate::sheet_functions::col_num_to_col_name;
+use crate::ui_sheet_functions::{recalculate_dependecy,sort_sheet};
 
 pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
     let save_file_name = format!("{}.csv", filename);
@@ -160,7 +161,7 @@ pub fn insert_undo_redo(sheet_index: usize, row: i16, col: i16, previous_cell: C
             previous_cell:curr_cell,
         });
     }
-    sheet_functions::recalculate_dependecy(CellInfo {row: row as i16,col: col as i16}, &mut app.sheets[sheet_index].sheet);
+    recalculate_dependecy(CellInfo {row: row as i16,col: col as i16}, &mut app.sheets[sheet_index].sheet);
 }
 
 pub fn cut_undo_redo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: Cell, row2: i16, col2: i16, previous_cell2: Cell, app: &mut SpreadsheetApp, redo: bool) {
@@ -192,8 +193,8 @@ pub fn cut_undo_redo(sheet_index: usize, row1: i16, col1: i16, previous_cell1: C
     if cell2_2.row != -1 && cell2_2.col != -1 {
         get_or_create_cell(&mut app.sheets[sheet_index].sheet,cell2_2.row as i32,cell2_2.col as i32).dependencies.insert(col2 as i32 * 1000 + row2 as i32);
     }
-    sheet_functions::recalculate_dependecy(CellInfo {row: row1 as i16,col: col1 as i16}, &mut app.sheets[sheet_index].sheet);
-    sheet_functions::recalculate_dependecy(CellInfo {row: row2 as i16,col: col2 as i16}, &mut app.sheets[sheet_index].sheet);
+    recalculate_dependecy(CellInfo {row: row1 as i16,col: col1 as i16}, &mut app.sheets[sheet_index].sheet);
+    recalculate_dependecy(CellInfo {row: row2 as i16,col: col2 as i16}, &mut app.sheets[sheet_index].sheet);
     if !redo {
     app.redo_stack.push(Action::CutAction {
         sheet_index : sheet_index,
@@ -377,7 +378,7 @@ pub fn sort_extension(col1: i32, row1: i32, col2: i32, row2: i32, sort_key: &str
         }
     }
     sort_add_to_stack(app.current_sheet_index, col1, row1, col2, row2, app, false);
-    sheet_functions::sort_sheet(&mut app.sheets[app.current_sheet_index].sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
+    sort_sheet(&mut app.sheets[app.current_sheet_index].sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
 }
 
 pub fn sort_button_parser(app: &mut SpreadsheetApp,sort_asc : bool) {

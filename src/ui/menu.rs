@@ -8,6 +8,8 @@ use crate::ui::utils::{load_all_sheets, save_all_sheets, convert_to_csv, open_cs
 use egui_plot::{Line, PlotPoints, Plot};
 use crate::ui::fonts::FONTS;
 use std::string::String ;
+use crate::ui_sheet_functions::{change_dependecy_set,update_dependencies,recalculate_dependecy};
+use crate::ui::app_impl::Mode::Normal;
 
 
 pub fn cut(app: &mut SpreadsheetApp) {
@@ -66,10 +68,10 @@ pub fn paste(app: &mut SpreadsheetApp) {
                 sheet_functions::remove_dependency(&CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 
                 *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,old_row as i32,old_col as i32) = new_cell1.clone();
-                sheet_functions::change_dependecy_set(&mut new_cell1, &mut app.sheets[app.current_sheet_index].sheet, false , row as i16,col as i16,old_row as i16,old_col as i16);
+                change_dependecy_set(&mut new_cell1, &mut app.sheets[app.current_sheet_index].sheet, false , row as i16,col as i16,old_row as i16,old_col as i16);
                 let mut new_cell2 = old_cell1.clone();
-                sheet_functions::change_dependecy_set(&mut new_cell2, &mut app.sheets[app.current_sheet_index].sheet, true, row as i16,col as i16,old_row as i16,old_col as i16);
-                sheet_functions::update_dependencies(old_row, old_col, row as i16, col as i16, &mut app.sheets[app.current_sheet_index].sheet);
+                change_dependecy_set(&mut new_cell2, &mut app.sheets[app.current_sheet_index].sheet, true, row as i16,col as i16,old_row as i16,old_col as i16);
+                update_dependencies(old_row, old_col, row as i16, col as i16, &mut app.sheets[app.current_sheet_index].sheet);
                 for dependency in old_cell2.dependencies.clone() {
                     let dependency_row = dependency % 1000;
                     let dependency_col = dependency / 1000;
@@ -83,7 +85,7 @@ pub fn paste(app: &mut SpreadsheetApp) {
                 }
                 *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,row as i32,col as i32) = new_cell2;
                 *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,old_row as i32,old_col as i32) = new_cell1;
-                sheet_functions::recalculate_dependecy(CellInfo { row: old_row as i16, col: old_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
+                recalculate_dependecy(CellInfo { row: old_row as i16, col: old_col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 app.redo_stack.clear();
                 app.undo_stack.push(Action::CutAction {
                     sheet_index: app.current_sheet_index,
@@ -100,7 +102,7 @@ pub fn paste(app: &mut SpreadsheetApp) {
                 let mut new_cell = cell.clone();
                 new_cell.dependencies = old_cell2.dependencies.clone();
                 *get_or_create_cell(&mut app.sheets[app.current_sheet_index].sheet,row as i32,col as i32) = new_cell.clone();
-                sheet_functions::recalculate_dependecy(CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
+                recalculate_dependecy(CellInfo { row: row as i16, col: col as i16 }, &mut app.sheets[app.current_sheet_index].sheet);
                 app.redo_stack.clear();
                 app.undo_stack.push(Action::Inserted {
                     sheet_index: app.current_sheet_index,
@@ -128,7 +130,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::Save;
                 }
                 if app.show_menu == Menu::Save {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     egui::Window::new("Save").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
                         ui.label("Enter filename:");
                         let resp = ui.text_edit_singleline(&mut app.save_filename);
@@ -167,7 +169,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }
                
                 if app.show_menu == Menu::Open {
-                    Menu :: Mode == Normal;
+                   app.mode = Normal;
                     egui::Window::new("Open").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
                         ui.label("Enter filename:");    
                         let resp = ui.text_edit_singleline(&mut app.open_filename);
@@ -202,7 +204,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::FindAndReplace;
                 }
                 if app.show_menu == Menu::FindAndReplace {
-                    Mennu::Mode == Normal;
+                    app.mode = Normal;
                     egui::Window::new("Find and Replace").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Find:");
                         ui.text_edit_singleline(&mut app.find_text);
@@ -230,7 +232,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::PlotGraph;
                 }
                 if app.show_menu == Menu::PlotGraph {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     egui::Window::new("Plot Graph").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Enter first column (e.g., A):");
                         ui.text_edit_singleline(&mut app.plot_column1);
@@ -312,7 +314,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }
 
                 if ui.button("Clear").clicked() { 
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     app.sheets[app.current_sheet_index].sheet.data.clear();
                     app.sheets[app.current_sheet_index].sheet.buul.clear();
                     app.sheets[app.current_sheet_index].sheet.tuup.clear();
@@ -322,28 +324,28 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }
 
                 if ui.button("Cut").clicked() {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     cut(app);
                 }
 
                 if ui.button("Copy").clicked() {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     copy(app);
                 }
 
                 if ui.button("Paste").clicked() {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     paste(app);
                 }
 
                 if ui.button("Undo").clicked() {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     app.undo();
                     ctx.request_repaint();
                 }
 
                 if ui.button("Redo").clicked() {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     app.redo();
                     ctx.request_repaint();
                 }
@@ -371,7 +373,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::SelectCell;
                 }
                 if app.show_menu == Menu::SelectCell {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     egui::Window::new("select_cell").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Enter cell to scroll to:");
                         let select_cell = ui.text_edit_singleline(&mut app.input_select_cell);
@@ -409,7 +411,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }        
 
                 if app.show_menu == Menu::Theme {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     egui::Window::new("Theme").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Select theme:");
                         for theme in &THEMES {
@@ -424,7 +426,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu=Menu :: Sort;
                 }
                 if app.show_menu == Menu :: Sort {
-                    Menu::Mode == Normal;
+                    app.mode = Normal;
                     egui::Window::new("Sort").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Select column to sort:");
                         ui.horizontal(|ui| {
