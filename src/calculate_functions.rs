@@ -55,21 +55,10 @@ pub fn min(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
         let mut count=0;
         for (row,col) in sheet.data.keys(){
             if row >= &val_row1 && row <= &val_row2 && col >= &c1 && col <= &c2{
-                let value = sheet
-                    .data
-                    .get(&(*row, *col))
-                    .map_or(0, |cell| cell.value); 
-                if value < a {
-                    a = value;
-                }
-                count = count +1  ;
-            }
-        }
-        if count != range_size{
-            a = if a > 0 {0} else {a};
-        }
-
-    }
+                let value = sheet.data.get(&(*row, *col)).map_or(0, |cell| cell.value); 
+                if value < a { a = value;}count = count +1  ;
+            }}
+        if count != range_size{ a = if a > 0 {0} else {a};}}
     a
 }
 
@@ -93,21 +82,10 @@ pub fn max(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
         let mut count=0;
         for (row,col) in sheet.data.keys(){
             if row >= &val_row1 && row <= &val_row2 && col >= &c1 && col <= &c2{
-                let value = sheet
-                    .data
-                    .get(&(*row, *col))
-                    .map_or(0, |cell| cell.value); 
-                if value > a {
-                    a = value;
-                }
-                count = count + 1;
-            }
-        }
-        if count != range_size{
-            a = if a < 0 {0} else {a};
-        }
-
-    }
+                let value = sheet.data.get(&(*row, *col)).map_or(0, |cell| cell.value); 
+                if value > a { a = value;}count = count + 1;
+            }}
+        if count != range_size{ a = if a < 0 {0} else {a};} }
     a
 }
 
@@ -145,14 +123,9 @@ pub fn stdev(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i
     else{
         for (row,col) in sheet.data.keys(){
             if row >= &val_row1 && row <= &val_row2 && col >= &c1 && col <= &c2{
-                let value = sheet
-                    .data
-                    .get(&(*row, *col))
-                    .map_or(0, |cell| cell.value); 
-                let diff : i64 =( value - avg_val) as i64;
-                total += diff * diff;
-            }
-        }
+                let value = sheet.data.get(&(*row, *col)).map_or(0, |cell| cell.value); 
+                let diff : i64 =( value - avg_val) as i64;total += diff * diff;
+            }}
     }
     let std = (total as f64 / count as f64).sqrt();
     std.round() as i32
