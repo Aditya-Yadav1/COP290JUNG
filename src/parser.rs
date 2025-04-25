@@ -12,6 +12,15 @@ use crate::sheet_functions::OpCode::*;
 use std::string::String; 
 use crate::sheet_functions::get_or_create_cell;  
 
+/// Maps a character operator to the corresponding `OpCode` for operations involving a cell and a constant.
+///
+/// # Arguments
+/// * `op_code` - The character representing the operator (`+`, `-`, `*`, `/`).
+/// * `constopcell` - If `true`, indicates the constant is the first operand (e.g., constant / cell); otherwise, the cell is the first operand.
+///
+/// # Returns
+/// The corresponding `OpCode` for the operation, or `NoConstraint` for constant operations (like cell = int, string)
+
 pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
     // function to get opcode for the case of int op cell or cell op int
     match op_code {
@@ -23,6 +32,8 @@ pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
     }
 }
 
+/// Maps a character operator to the corresponding `OpCode` for operations between two cells.
+
 pub fn get_op_code2(op_code: char) -> OpCode {
     match op_code {
         '+' => CellPlusCell,
@@ -33,6 +44,13 @@ pub fn get_op_code2(op_code: char) -> OpCode {
     }
 }
 
+/// Maps a function name to the corresponding `OpCode` for range-based operations.
+///
+/// # Arguments
+/// * `func` - The function name (e.g., "SUM", "MIN", "MAX", "AVG", "STDEV").
+///
+/// # Returns
+/// The corresponding `OpCode` for the function, or `NoConstraint` if the opcode is not defined.
 
 pub fn func_to_op_code(func: &str) -> OpCode {
     // function for getting opcode for the case of func(cell:cell)
@@ -46,11 +64,27 @@ pub fn func_to_op_code(func: &str) -> OpCode {
     }
 }
 
-
+/// Removes all whitespace characters from a command string.
+///
+/// # Arguments
+/// * `command` - The mutable string to process.
 
 fn remove_space(command: &mut String) {
     *command = command.chars().filter(|&c| c != ' ').collect();
 }
+
+/// Parses a command string and updates the spreadsheet accordingly, handling navigation, cell operations, and sorting.
+///
+/// # Arguments
+/// * `command` - The command string to parse (e.g., "A1=5", "A1=A2+A3", "scroll_toA1").
+/// * `row_start` - A mutable reference to the starting row index for display.
+/// * `col_start` - A mutable reference to the starting column index for display.
+/// * `time` - A mutable reference to track the execution time or sleep duration.
+/// * `status` - A mutable string to store the operation status (e.g., "ok", "err", "Invalid cmd").
+/// * `total_rows` - The total number of rows in the spreadsheet.
+/// * `total_cols` - The total number of columns in the spreadsheet.
+/// * `sheet` - The mutable spreadsheet to operate on.
+/// * `print_enabled` - A mutable boolean indicating whether output printing is enabled.
 
 pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32, sheet: &mut Sheet,print_enabled : &mut bool){
     let mut command = command.trim().to_string();
