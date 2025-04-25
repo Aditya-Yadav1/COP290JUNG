@@ -124,6 +124,7 @@ pub struct Sheet {
     #[cfg_attr(feature = "gui", serde(with = "tuple_key_map"))]
     pub data: HashMap<(i16, i16), Cell>,
     #[cfg_attr(feature = "gui", serde(with = "nested_tuple_key_map"))]
+    #[allow(clippy::type_complexity)]
     pub tuup: HashMap<((i16,i16),(i16,i16)),Vec<(i16,i16)>>,
 }
 
@@ -173,16 +174,9 @@ impl Sheet {
     /// # Returns
     /// A new `Sheet` instance.
     pub fn new(rows: i32, cols: i32) -> Self {
-        let mut buul = Vec::with_capacity(rows as usize);
+        let buul = vec![vec![false; cols as usize]; rows as usize];
 
         // Initialize the `buul` vector
-        for _ in 0..rows {
-            let mut row = Vec::with_capacity(cols as usize);
-            for _ in 0..cols {
-                row.push(false); // Initialize `buul` with `false`
-            }
-            buul.push(row);
-        }
 
         // Initialize the `data` and `tuup` HashMaps as empty
         let data = HashMap::with_capacity(1000);
@@ -209,7 +203,7 @@ pub fn col_num_to_col_name(col_num: i32) -> String {
     let mut col_name = String::new();
     let mut col_num = col_num;
     while col_num >= 0 {
-        let x = ('A' as u8 + (col_num % 26) as  u8) as char;
+        let x = (b'A' + (col_num % 26) as  u8) as char;
         col_name.push(x);
         col_num /= 26;
         col_num -= 1;
@@ -228,9 +222,9 @@ pub fn col_name_to_col_num(col_name: &str) -> i32 {
     let mut col  = -1;
     for c in col_name.chars() {
         col = (col + 1) * 26;
-        col += (c as u8 - 'A' as u8) as i32;
+        col += (c as u8 - b'A') as i32;
     }
-    return col;
+    col
 }
 /// Prints a portion of the spreadsheet to the console, starting from the specified coordinates.
 ///
@@ -256,7 +250,7 @@ pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: 
     for i in start_row..max_row_display {
         print!("{:>space$}", i + 1); // Print row header
         for j in start_col..max_col_display {
-            if let Some(cell) = sheet.data.get(&(i , j )) {
+            if let Some(cell) = sheet.data.get(&(i as i16 , j as i16 )) {
                 // If the cell exists in the map
                 if !cell.is_error {
                     if let Some(s) = &cell.string {
