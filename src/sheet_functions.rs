@@ -215,7 +215,7 @@ pub fn col_num_to_col_name(col_num: i32) -> String {
         col_num -= 1;
     }
     col_name = col_name.chars().rev().collect();
-    return col_name;
+    col_name
 }
 /// Converts an alphabetical column name to its corresponding column number (e.g., "A" -> 0, "B" -> 1).
 ///
@@ -256,7 +256,7 @@ pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: 
     for i in start_row..max_row_display {
         print!("{:>space$}", i + 1); // Print row header
         for j in start_col..max_col_display {
-            if let Some(cell) = sheet.data.get(&(i as i16, j as i16)) {
+            if let Some(cell) = sheet.data.get(&(i , j )) {
                 // If the cell exists in the map
                 if !cell.is_error {
                     if let Some(s) = &cell.string {
@@ -392,7 +392,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 // range check 
                     for i in cell1.row..=cell2.row {
                         for j in cell1.col..=cell2.col {
-                            if let Some(ref_cell) = sheet.data.get(&(i as i16, j as i16)) {
+                            if let Some(ref_cell) = sheet.data.get(&(i , j)) {
                                 if ref_cell.is_error || ref_cell.string.is_some() {
                                     err = true;
                                     break;
@@ -405,8 +405,8 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                     if !err{
                         val = compute_range_func(
                             sheet, op_code,
-                            cell1.row as i16, cell1.col as i16,
-                            cell2.row as i16, cell2.col as i16,
+                            cell1.row , cell1.col ,
+                            cell2.row , cell2.col ,
                             &mut String::new()
                         );
                     }
@@ -419,10 +419,10 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
     {
         let c = get_or_create_cell(sheet, row as i32, col as i32); 
         c.is_error = is_error;
-        if is_error2 == true {
+        if is_error2 {
             c.is_error = true;
         }
-        else if op_code == CellEqualsCell && string_value != "" {
+        else if op_code == CellEqualsCell && !string_value.is_empty() {
              c.string = Some(string_value.clone());
          } else{
              c.value  = new_value;
@@ -504,7 +504,7 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
     match op_code {
         OpCode::NoConstraint => {}
         OpCode::CellEqualsCell| OpCode::CellPlusConstant| OpCode::CellTimesConstant| OpCode::CellMinusConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell| OpCode::Sleep |OpCode::ConstantMinusCell => {
-            if let Some(dependent_cell) = sheet.data.get_mut(&(cell1.row as i16, cell1.col as i16)) {
+            if let Some(dependent_cell) = sheet.data.get_mut(&(cell1.row , cell1.col )) {
                 dependent_cell.dependencies.remove(&(col * 1000 + row));
             } 
         }
@@ -530,11 +530,11 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
             }
         }
         OpCode::CellPlusCell| OpCode::CellMinusCell| OpCode::CellTimesCell| OpCode::CellDivideCell => {
-            if let Some(dependent_cell1) = sheet.data.get_mut(&(cell1.row as i16, cell1.col as i16)) {
+            if let Some(dependent_cell1) = sheet.data.get_mut(&(cell1.row , cell1.col )) {
                 dependent_cell1.dependencies.remove(&(col * 1000 + row));
             }
 
-            if let Some(dependent_cell2) = sheet.data.get_mut(&(cell2.row as i16, cell2.col as i16)) {
+            if let Some(dependent_cell2) = sheet.data.get_mut(&(cell2.row , cell2.col )) {
                 dependent_cell2.dependencies.remove(&(col * 1000 + row));
             }
         }
@@ -555,18 +555,18 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
 /// * `sheet` - The spreadsheet containing the cell data.
 pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: CellInfo, sheet: &Sheet) {
     // Get the current cell from the HashMap
-    if let Some(curr_cell) = sheet.data.get(&(cell.row as i16, cell.col as i16)) {
+    if let Some(curr_cell) = sheet.data.get(&(cell.row , cell.col )) {
         for &curr in &curr_cell.dependencies {
-            if !avl_tree.contains_key(&curr) {
-                avl_tree.insert(curr, 1);
-                let temp = CellInfo {
-                    row: (curr % 1000) as i16,
-                    col: (curr / 1000) as i16,
-                };
-                add_to_tree(avl_tree, temp, sheet);
-            } else {
-                *avl_tree.entry(curr).or_insert(1) += 1;
-            }
+            if let std::collections::hash_map::Entry::Vacant(e) = avl_tree.entry(curr) {
+                           e.insert(1);
+                               let temp = CellInfo {
+                                row: (curr % 1000) as i16,
+                                col: (curr / 1000) as i16,
+                            };
+                            add_to_tree(avl_tree, temp, sheet);
+                        } else {
+                            *avl_tree.entry(curr).or_insert(1) += 1;
+                        }
         }
     }// check range dependency
     if sheet.buul[cell.row as usize][cell.col as usize]{
@@ -577,8 +577,8 @@ pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: Cel
                 for (target_col, target_row) in target_vector {
                 // dependent
                     let key = *target_col as i32 * 1000 + *target_row as i32;
-                    if !avl_tree.contains_key(&key) {
-                        avl_tree.insert(key, 1);
+                    if let std::collections::hash_map::Entry::Vacant(e) = avl_tree.entry(key) {
+                        e.insert(1);
                         let temp = CellInfo {
                             row: *target_row,
                             col: *target_col,
@@ -690,7 +690,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             let key2 = (cell2.col, cell2.row);
             if sheet.tuup.contains_key(&(key1,key2)){
                 let vec = sheet.tuup.get(&(key1,key2)).unwrap();
-                if vec.len() > 0{
+                if !vec.is_empty() {
                     let row = vec[0].1;
                     let col = vec[0].0;
                     let cell = get_or_create_cell(sheet, row as i32, col as i32);
@@ -704,7 +704,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
                 for i in cell1.row..=cell2.row {
                     for j in cell1.col..=cell2.col {
                         sheet.buul[i as usize][j as usize] = true; // Mark the cell as used
-                        if let Some(ref_cell) = sheet.data.get(&(i as i16, j as i16)) {
+                        if let Some(ref_cell) = sheet.data.get(&(i , j )) {
                             if ref_cell.is_error || ref_cell.string.is_some() {
                                 calc_error = true;
                             }
@@ -722,7 +722,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             cell.cell1 = cell1.clone();
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
-            ans = compute_range_func(sheet,op_code,cell1.row as i16,cell1.col as i16,cell2.row as i16,cell2.col as i16,status,);
+            ans = compute_range_func(sheet,op_code,cell1.row ,cell1.col ,cell2.row ,cell2.col ,status,);
         
         }
 
@@ -779,7 +779,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
     if op_code == OpCode::CellEqualsCell && !stringans.is_empty() {
         cell.string = Some(stringans.clone());
     }
-    let sorted = topological_sort(&mut avl_tree, &sheet); 
+    let sorted = topological_sort(&mut avl_tree, sheet); 
     *status = String::from("ok");  
     for i in sorted.into_iter() {
         let row = i % 1000;
