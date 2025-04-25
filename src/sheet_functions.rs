@@ -314,9 +314,9 @@ pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, shee
         for &dep in &sheet.data.get(&((node % 1000) as i16, (node / 1000 )as i16)).expect("not in map").dependencies {
             if let Some(indegree) = avl_tree.get_mut(&dep) {
             *indegree -= 1;
-            if *indegree == 0 {
-                queue.push_back(dep);
-            }
+                if *indegree == 0 {
+                    queue.push_back(dep);
+                }
             }
         }
         // get the range dependencies
@@ -336,12 +336,7 @@ pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, shee
                 }
             }
         }
-
-
-        
-
     }
-
     result
 } 
 
@@ -436,9 +431,7 @@ pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: Cel
                         col: *target_col,
                     };
                     add_to_tree(avl_tree, temp, sheet);
-                } else {
-                    *avl_tree.entry(key).or_insert(1) += 1;
-                }
+                } else {*avl_tree.entry(key).or_insert(1) += 1;}
             }
             }
         }
@@ -455,9 +448,11 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(key, 0);
     let temp = CellInfo { row: -1, col: -1 };
-
+    let start_time = std::time::Instant::now();
     add_to_tree(&mut avl_tree, curr_cell.clone(), sheet); 
-
+    let add_time = start_time.elapsed();
+    println!("Time taken to add to tree: {:?}", add_time);
+    let start_time2 = std::time::Instant::now();
     match op_code {
         OpCode::NoConstraint | String => {remove_dependency(&curr_cell, sheet);
             let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32); 
@@ -526,6 +521,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             if check_cycle_range_funcs(&avl_tree, &cell1, &cell2) {
                 *status = String::from("circular error");return;
             }
+            println!("{}",start_time2.elapsed().as_secs_f64());
             for i in cell1.row..=cell2.row {
                 for j in cell1.col..=cell2.col {
                     sheet.buul[i as usize][j as usize] = true; // Mark the cell as used
@@ -536,7 +532,9 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
                     }
                 }
             }
+            println!("{}",start_time2.elapsed().as_secs_f64());
             remove_dependency(&curr_cell, sheet);
+            println!("remove dep{}",start_time2.elapsed().as_secs_f64());
             if let Some(existing) = sheet.tuup.get_mut(&((cell1.col, cell1.row), (cell2.col, cell2.row))) {
                 existing.push((curr_cell.col, curr_cell.row));
             } else {
@@ -547,7 +545,10 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
             ans = compute_range_func(sheet,op_code,cell1.row as i16,cell1.col as i16,cell2.row as i16,cell2.col as i16,status,);
+            println!("comp{}",start_time2.elapsed().as_secs_f64());
+        
         }
+
         OpCode::CellPlusCell| OpCode::CellMinusCell| OpCode::CellTimesCell| OpCode::CellDivideCell => {
             if check_cycle(&avl_tree, &cell1, &cell2) {
                 *status = String::from("circular error");return;
