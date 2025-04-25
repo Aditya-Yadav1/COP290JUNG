@@ -1,17 +1,17 @@
 all: build
 
 build:
-	@cargo build --release --features autograder --timings
+	@cargo build --release
 
 test:
-	@cargo test --features autograder -- --test-threads 1
+	@cargo test  
 
 coverage:
-	@cargo tarpaulin --features autograder -- --test-threads 1
+	@cargo tarpaulin 
 
 ext1:
 	@cargo build --release --features gui
-	@./target/release/spreadsheet 999 18278
+	@./target/release/spreadsheet
 
 check: fmt clippy
 

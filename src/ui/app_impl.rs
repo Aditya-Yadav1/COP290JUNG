@@ -1,13 +1,13 @@
-use crate::sheet_functions::{CellInfo, col_num_to_col_name,get_or_create_cell};
-use crate::parser; 
-use serde::{Serialize, Deserialize};
-use crate::sheet_functions::{self,Sheet,Cell};
-use crate::ui::themes::Theme;
-use crate::ui::themes::THEMES;
-use crate::ui::utils;
-use std::cell;
-use std::string::String; 
+use crate::parser;
 use crate::sheet_functions::OpCode;
+use crate::sheet_functions::{self, Cell, Sheet};
+use crate::sheet_functions::{CellInfo, col_num_to_col_name, get_or_create_cell};
+use crate::ui::themes::THEMES;
+use crate::ui::themes::Theme;
+use crate::ui::utils;
+use serde::{Deserialize, Serialize};
+use std::cell;
+use std::string::String;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Sheets {
@@ -15,7 +15,7 @@ pub struct Sheets {
     pub name: String,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub enum Action {
     // NewSheet {
     //     sheet: Sheets,
@@ -36,12 +36,12 @@ pub enum Action {
     //     deleted_cell: Cell,
     // },
     Inserted {
-        sheet_index : usize,
-        row : i16,
-        col : i16,
+        sheet_index: usize,
+        row: i16,
+        col: i16,
         previous_cell: Cell,
     },
-    CutAction{
+    CutAction {
         sheet_index: usize,
         row1: i16,
         col1: i16,
@@ -49,29 +49,32 @@ pub enum Action {
         row2: i16,
         col2: i16,
         previous_cell2: Cell,
-    },//1 -> cut from here , 2-> pasted here
+    }, //1 -> cut from here , 2-> pasted here
     FindAndReplace {
         sheet_index: usize,
         changes: Vec<(usize, usize, Cell, Cell, String)>, // (row, col, old_cell, new_cell, command)
     },
-    Sort{
+    Sort {
         sheet_index: usize,
         changes: Vec<Vec<Cell>>,
         row1: i32,
         col1: i32,
         row2: i32,
         col2: i32,
-    }
+    },
 }
 
-#[derive(Clone,PartialEq)]
-pub enum CutCopy{
+#[derive(Clone, PartialEq)]
+pub enum CutCopy {
     Cut,
     Copied,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Mode { Normal, Insert }
+pub enum Mode {
+    Normal,
+    Insert,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Menu {
@@ -111,25 +114,21 @@ pub struct SpreadsheetApp {
     pub new_sheet_name: String,
     pub undo_stack: Vec<Action>,
     pub redo_stack: Vec<Action>,
-    pub clipboard: Option<(Cell,CutCopy,i16,i16)>,
+    pub clipboard: Option<(Cell, CutCopy, i16, i16)>,
     pub find_text: String,
     pub replace_text: String,
-    pub cut_copied_cell: Option<(i16,i16)>,
-    pub plot_column1: String, 
-    pub plot_column2: String, 
-    pub plot_row_start: String, 
-    pub plot_row_end: String, 
-    pub show_plot: bool, 
+    pub cut_copied_cell: Option<(i16, i16)>,
+    pub plot_column1: String,
+    pub plot_column2: String,
+    pub plot_row_start: String,
+    pub plot_row_end: String,
+    pub show_plot: bool,
     pub sort_range_start: String,
     pub sort_range_end: String,
-    pub sort_col_row : String,
-    pub ascending : bool,
-    pub input_select_cell : String,
+    pub sort_col_row: String,
+    pub ascending: bool,
+    pub input_select_cell: String,
 }
-
-
-
-
 
 impl SpreadsheetApp {
     pub fn new(sheets: Vec<Sheets>) -> Self {
@@ -159,7 +158,7 @@ impl SpreadsheetApp {
             clipboard: None,
             find_text: String::new(),
             replace_text: String::new(),
-            cut_copied_cell : None,
+            cut_copied_cell: None,
             plot_column1: String::new(),
             plot_column2: String::new(),
             plot_row_start: String::new(),
@@ -180,53 +179,62 @@ impl SpreadsheetApp {
         let find_text = self.find_text.clone();
         let replace_text = self.replace_text.clone();
         let mut is_num;
-        let num_row=sheet.rows;
-        let num_col=sheet.cols;
-        for((row,col),cell) in sheet.data.clone().iter(){
-                let cell_content = if let Some(s) = &cell.string {
-                    is_num=false;
-                    s.clone()
-                } else if cell.is_error {
-                    is_num=false;
-                    "Err".to_string()
-                } else {
-                    is_num=true;
-                    cell.value.to_string()
-                };
+        let num_row = sheet.rows;
+        let num_col = sheet.cols;
+        for ((row, col), cell) in sheet.data.clone().iter() {
+            let cell_content = if let Some(s) = &cell.string {
+                is_num = false;
+                s.clone()
+            } else if cell.is_error {
+                is_num = false;
+                "Err".to_string()
+            } else {
+                is_num = true;
+                cell.value.to_string()
+            };
 
-                if cell_content == find_text && (cell.op_code == OpCode::NoConstraint || cell.op_code == OpCode::String) {
-                    
-                    let old_cell = cell.clone();
-                    let command;
-                    if !is_num{
-                        command = format!("{}{}=\"{}\"", col_num_to_col_name(*col as i32), row + 1, replace_text);
-                    }
-                    else{
-                        command = format!("{}{}={}", col_num_to_col_name(*col as i32), row + 1, replace_text);
-                    }
-                    sheet_functions::remove_dependency(
-                        &CellInfo {
-                            row: *row as i16,
-                            col: *col as i16,
-                        },
-                        sheet,
+            if cell_content == find_text
+                && (cell.op_code == OpCode::NoConstraint || cell.op_code == OpCode::String)
+            {
+                let old_cell = cell.clone();
+                let command;
+                if !is_num {
+                    command = format!(
+                        "{}{}=\"{}\"",
+                        col_num_to_col_name(*col as i32),
+                        row + 1,
+                        replace_text
                     );
-                    parser::parse_command(
-                        &command,
-                        &mut self.row_start,
-                        &mut self.col_start,
-                        &mut self.time,
-                        &mut self.status,
-                        &num_row,
-                        &num_col,
-                        & mut sheet,
-                        &mut true,
+                } else {
+                    command = format!(
+                        "{}{}={}",
+                        col_num_to_col_name(*col as i32),
+                        row + 1,
+                        replace_text
                     );
-                    let new_cell = get_or_create_cell(sheet, *row as i32, *col as i32).clone();
-                    changes.push(( *row as usize, *col as usize, old_cell, new_cell, command));
                 }
+                sheet_functions::remove_dependency(
+                    &CellInfo {
+                        row: *row as i16,
+                        col: *col as i16,
+                    },
+                    sheet,
+                );
+                parser::parse_command(
+                    &command,
+                    &mut self.row_start,
+                    &mut self.col_start,
+                    &mut self.time,
+                    &mut self.status,
+                    &num_row,
+                    &num_col,
+                    &mut sheet,
+                    &mut true,
+                );
+                let new_cell = get_or_create_cell(sheet, *row as i32, *col as i32).clone();
+                changes.push((*row as usize, *col as usize, old_cell, new_cell, command));
             }
-        
+        }
 
         if !changes.is_empty() {
             let len = changes.len();
@@ -235,10 +243,8 @@ impl SpreadsheetApp {
                 changes,
             });
             self.redo_stack.clear();
-            let sorted = sheet_functions::topological_sort(
-                &mut std::collections::HashMap::new(),
-                sheet,
-            );
+            let sorted =
+                sheet_functions::topological_sort(&mut std::collections::HashMap::new(), sheet);
             for i in sorted {
                 let r = i % 1000;
                 let c = i / 1000;
@@ -258,29 +264,65 @@ impl SpreadsheetApp {
         self.clear_clipboard();
         if let Some(action) = self.undo_stack.pop() {
             match action {
-                Action::Inserted {sheet_index,row,col,previous_cell} => {
-                    utils::insert_undo_redo(sheet_index, row, col, previous_cell,self,false);
+                Action::Inserted {
+                    sheet_index,
+                    row,
+                    col,
+                    previous_cell,
+                } => {
+                    utils::insert_undo_redo(sheet_index, row, col, previous_cell, self, false);
                     self.status = "Undone cell edit".to_string();
                 }
-                Action::CutAction {sheet_index,row1,col1,previous_cell1,row2,col2,previous_cell2} => {
-                    utils::cut_undo_redo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self,false);
+                Action::CutAction {
+                    sheet_index,
+                    row1,
+                    col1,
+                    previous_cell1,
+                    row2,
+                    col2,
+                    previous_cell2,
+                } => {
+                    utils::cut_undo_redo(
+                        sheet_index,
+                        row1,
+                        col1,
+                        previous_cell1,
+                        row2,
+                        col2,
+                        previous_cell2,
+                        self,
+                        false,
+                    );
                     self.status = "Undone cut".to_string();
                 }
                 // Action::Deleted { sheet_index, row, col, deleted_cell } => {
                 //     // utils::delete_cell_and_update_dependencies(sheet_index, row, col, deleted_cell, &mut self);
                 //     self.status = "Undone delete".to_string();
                 // }
-                Action::FindAndReplace { sheet_index, changes } => {
+                Action::FindAndReplace {
+                    sheet_index,
+                    changes,
+                } => {
                     let mut sheet = &mut self.sheets[sheet_index].sheet;
                     let sheet1 = sheet.clone();
                     let mut redo_changes = Vec::new();
                     for (row, col, old_cell, _, command) in changes {
                         let original_cmd = if old_cell.string.is_some() {
-                            format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, old_cell.string.as_ref().unwrap())
+                            format!(
+                                "{}{}=\"{}\"",
+                                col_num_to_col_name(col as i32),
+                                row + 1,
+                                old_cell.string.as_ref().unwrap()
+                            )
                         } else if old_cell.is_error {
                             format!("{}{}=Err", col_num_to_col_name(col as i32), row + 1)
                         } else {
-                            format!("{}{}=\"{}\"", col_num_to_col_name(col as i32), row + 1, old_cell.value)
+                            format!(
+                                "{}{}=\"{}\"",
+                                col_num_to_col_name(col as i32),
+                                row + 1,
+                                old_cell.value
+                            )
                         };
                         sheet_functions::remove_dependency(
                             &CellInfo {
@@ -300,8 +342,15 @@ impl SpreadsheetApp {
                             &mut sheet,
                             &mut true,
                         );
-                        let new_cell_after_undo = get_or_create_cell(sheet, row as i32, col as i32).clone();
-                        redo_changes.push((row, col, old_cell.clone(), new_cell_after_undo, command));
+                        let new_cell_after_undo =
+                            get_or_create_cell(sheet, row as i32, col as i32).clone();
+                        redo_changes.push((
+                            row,
+                            col,
+                            old_cell.clone(),
+                            new_cell_after_undo,
+                            command,
+                        ));
                     }
                     self.redo_stack.push(Action::FindAndReplace {
                         sheet_index,
@@ -323,12 +372,22 @@ impl SpreadsheetApp {
                     }
                     self.status = "Undone find and replace".to_string();
                 }
-                Action::Sort{sheet_index,changes,row1,col1,row2,col2} => {
-
+                Action::Sort {
+                    sheet_index,
+                    changes,
+                    row1,
+                    col1,
+                    row2,
+                    col2,
+                } => {
                     utils::sort_add_to_stack(sheet_index, col1, row1, col2, row2, self, true);
-                    for i in row1..(row2 + 1){
-                        for j in col1..(col2 + 1){
-                            let cell = get_or_create_cell(&mut self.sheets[self.current_sheet_index].sheet, i, j);
+                    for i in row1..(row2 + 1) {
+                        for j in col1..(col2 + 1) {
+                            let cell = get_or_create_cell(
+                                &mut self.sheets[self.current_sheet_index].sheet,
+                                i,
+                                j,
+                            );
                             *cell = changes[(i - row1) as usize][(j - col1) as usize].clone();
                         }
                     }
@@ -348,17 +407,43 @@ impl SpreadsheetApp {
         self.clear_clipboard();
         if let Some(action) = self.redo_stack.pop() {
             match action {
-                Action::Inserted {sheet_index,row,col,previous_cell} => {
-                    utils::insert_undo_redo(sheet_index, row, col, previous_cell,self,true);
+                Action::Inserted {
+                    sheet_index,
+                    row,
+                    col,
+                    previous_cell,
+                } => {
+                    utils::insert_undo_redo(sheet_index, row, col, previous_cell, self, true);
                     self.status = "Redone cell edit".to_string();
                 }
-                Action::CutAction {sheet_index,row1,col1,previous_cell1,row2,col2,previous_cell2} => {
-                    utils::cut_undo_redo(sheet_index, row1, col1, previous_cell1, row2, col2, previous_cell2,self,true);
+                Action::CutAction {
+                    sheet_index,
+                    row1,
+                    col1,
+                    previous_cell1,
+                    row2,
+                    col2,
+                    previous_cell2,
+                } => {
+                    utils::cut_undo_redo(
+                        sheet_index,
+                        row1,
+                        col1,
+                        previous_cell1,
+                        row2,
+                        col2,
+                        previous_cell2,
+                        self,
+                        true,
+                    );
                     self.status = "Redone cut".to_string();
                 }
-                Action::FindAndReplace { sheet_index, changes } => {
+                Action::FindAndReplace {
+                    sheet_index,
+                    changes,
+                } => {
                     let mut sheet = &mut self.sheets[sheet_index].sheet;
-                    let  sheet1 = sheet.clone();
+                    let sheet1 = sheet.clone();
                     let mut undo_changes = Vec::new();
                     for (row, col, _, _, command) in changes {
                         let prev_cell = get_or_create_cell(sheet, row as i32, col as i32).clone();
@@ -380,7 +465,8 @@ impl SpreadsheetApp {
                             &mut sheet,
                             &mut true,
                         );
-                        let new_cell_after_redo = get_or_create_cell(sheet, row as i32, col as i32).clone();
+                        let new_cell_after_redo =
+                            get_or_create_cell(sheet, row as i32, col as i32).clone();
                         undo_changes.push((row, col, prev_cell, new_cell_after_redo, command));
                     }
                     self.undo_stack.push(Action::FindAndReplace {
@@ -403,11 +489,19 @@ impl SpreadsheetApp {
                     }
                     self.status = "Redone find and replace".to_string();
                 }
-                Action::Sort{sheet_index,changes,row1,col1,row2,col2} => {
+                Action::Sort {
+                    sheet_index,
+                    changes,
+                    row1,
+                    col1,
+                    row2,
+                    col2,
+                } => {
                     utils::sort_add_to_stack(sheet_index, col1, row1, col2, row2, self, false);
-                    for i in row1..(row2 + 1){
-                        for j in col1..(col2 + 1){
-                            let cell = get_or_create_cell(&mut self.sheets[sheet_index].sheet, i, j);
+                    for i in row1..(row2 + 1) {
+                        for j in col1..(col2 + 1) {
+                            let cell =
+                                get_or_create_cell(&mut self.sheets[sheet_index].sheet, i, j);
                             *cell = changes[(i - row1) as usize][(j - col1) as usize].clone();
                         }
                     }
@@ -424,7 +518,7 @@ impl SpreadsheetApp {
         self.cut_copied_cell = None;
     }
 
-    pub fn create_new_sheet(&mut self,rows: i32,cols: i32) {
+    pub fn create_new_sheet(&mut self, rows: i32, cols: i32) {
         let new_sheet = Sheet::new(rows, cols);
         let sheet_struct = Sheets {
             sheet: new_sheet.clone(),

@@ -1,5 +1,5 @@
 // src/lib.rs
+pub mod calculate_functions;
 pub mod parser;
 pub mod sheet_functions;
-pub mod calculate_functions;
-mod test; 
+mod test;

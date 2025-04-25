@@ -1,25 +1,22 @@
 use crate::calculate_functions::compute_cell;
 use crate::calculate_functions::compute_range_func;
-use std::collections::{HashSet,HashMap};
 #[cfg(feature = "gui")]
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::de::{self, SeqAccess, Visitor};
 #[cfg(feature = "gui")]
 use serde::ser::SerializeTuple;
 #[cfg(feature = "gui")]
-use serde::de::{self, Visitor, SeqAccess};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::{HashMap, HashSet};
 #[cfg(feature = "gui")]
 use std::fmt;
 use std::string::String;
 
 #[cfg(feature = "gui")]
 pub mod tuple_key_map {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::collections::HashMap;
-    use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
-    pub fn serialize<S, T>(
-        map: &HashMap<(i16, i16), T>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S, T>(map: &HashMap<(i16, i16), T>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
         T: Serialize,
@@ -28,9 +25,7 @@ pub mod tuple_key_map {
         vec.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D, T>(
-        deserializer: D,
-    ) -> Result<HashMap<(i16, i16), T>, D::Error>
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<HashMap<(i16, i16), T>, D::Error>
     where
         D: Deserializer<'de>,
         T: Deserialize<'de>,
@@ -42,8 +37,8 @@ pub mod tuple_key_map {
 
 #[cfg(feature = "gui")]
 pub mod nested_tuple_key_map {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::collections::HashMap;
-    use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
     pub fn serialize<S, T>(
         map: &HashMap<((i16, i16), (i16, i16)), T>,
@@ -69,7 +64,6 @@ pub mod nested_tuple_key_map {
     }
 }
 
-
 #[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpCode {
@@ -94,15 +88,14 @@ pub enum OpCode {
     String,
 }
 
-
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
 pub struct CellInfo {
     pub row: i16,
     pub col: i16,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
 pub struct Cell {
     pub value: i32,
@@ -111,9 +104,8 @@ pub struct Cell {
     pub op_code: OpCode,
     pub cell1: CellInfo,
     pub cell2: CellInfo,
-    pub dependencies: HashSet<i32>,  
+    pub dependencies: HashSet<i32>,
 }
- 
 
 #[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
 #[derive(Clone)]
@@ -125,7 +117,7 @@ pub struct Sheet {
     pub data: HashMap<(i16, i16), Cell>,
     #[cfg_attr(feature = "gui", serde(with = "nested_tuple_key_map"))]
     #[allow(clippy::type_complexity)]
-    pub tuup: HashMap<((i16,i16),(i16,i16)),Vec<(i16,i16)>>,
+    pub tuup: HashMap<((i16, i16), (i16, i16)), Vec<(i16, i16)>>,
 }
 
 /// Retrieves or creates a cell at the specified row and column in the sheet.
@@ -138,15 +130,18 @@ pub struct Sheet {
 /// # Returns
 /// A mutable reference to the cell.
 pub fn get_or_create_cell(sheet: &mut Sheet, row: i32, col: i32) -> &mut Cell {
-    sheet.data.entry((row as i16, col as i16)).or_insert_with(|| Cell {
-        value: 0,
-        is_error: false,
-        string: None,
-        op_code: OpCode::NoConstraint,
-        cell1: CellInfo { row: -1, col: -1 },
-        cell2: CellInfo { row: -1, col: -1 },
-        dependencies: std::collections::HashSet::new(),
-    })
+    sheet
+        .data
+        .entry((row as i16, col as i16))
+        .or_insert_with(|| Cell {
+            value: 0,
+            is_error: false,
+            string: None,
+            op_code: OpCode::NoConstraint,
+            cell1: CellInfo { row: -1, col: -1 },
+            cell2: CellInfo { row: -1, col: -1 },
+            dependencies: std::collections::HashSet::new(),
+        })
 }
 // is_valid_cell
 /// Checks if a cell is within the valid bounds of the spreadsheet.
@@ -161,8 +156,7 @@ pub fn get_or_create_cell(sheet: &mut Sheet, row: i32, col: i32) -> &mut Cell {
 /// `true` if the cell is within bounds, `false` otherwise.
 pub fn is_valid_cell(row: i32, col: i32, total_rows: i32, total_cols: i32) -> bool {
     row >= 0 && row < total_rows && col >= 0 && col < total_cols
-}           
-
+}
 
 impl Sheet {
     /// Creates a new spreadsheet with the specified dimensions.
@@ -181,7 +175,7 @@ impl Sheet {
         // Initialize the `data` and `tuup` HashMaps as empty
         let data = HashMap::with_capacity(1000);
         let tuup = HashMap::with_capacity(1000);
-        
+
         Sheet {
             rows,
             cols,
@@ -203,7 +197,7 @@ pub fn col_num_to_col_name(col_num: i32) -> String {
     let mut col_name = String::new();
     let mut col_num = col_num;
     while col_num >= 0 {
-        let x = (b'A' + (col_num % 26) as  u8) as char;
+        let x = (b'A' + (col_num % 26) as u8) as char;
         col_name.push(x);
         col_num /= 26;
         col_num -= 1;
@@ -219,7 +213,7 @@ pub fn col_num_to_col_name(col_num: i32) -> String {
 /// # Returns
 /// The column number (0-based).
 pub fn col_name_to_col_num(col_name: &str) -> i32 {
-    let mut col  = -1;
+    let mut col = -1;
     for c in col_name.chars() {
         col = (col + 1) * 26;
         col += (c as u8 - b'A') as i32;
@@ -234,7 +228,13 @@ pub fn col_name_to_col_num(col_name: &str) -> i32 {
 /// * `total_rows` - The total number of rows in the spreadsheet.
 /// * `total_cols` - The total number of columns in the spreadsheet.
 /// * `sheet` - The mutable spreadsheet to print.
-pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: i32, sheet: &mut Sheet) {
+pub fn print_sheet(
+    start_row: i32,
+    start_col: i32,
+    total_rows: i32,
+    total_cols: i32,
+    sheet: &mut Sheet,
+) {
     let max_col_display: i32 = start_col + std::cmp::min(total_cols - start_col, 10);
     let max_row_display: i32 = start_row + std::cmp::min(total_rows - start_row, 10);
     let space: usize = 10;
@@ -250,7 +250,7 @@ pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: 
     for i in start_row..max_row_display {
         print!("{:>space$}", i + 1); // Print row header
         for j in start_col..max_col_display {
-            if let Some(cell) = sheet.data.get(&(i as i16 , j as i16 )) {
+            if let Some(cell) = sheet.data.get(&(i as i16, j as i16)) {
                 // If the cell exists in the map
                 if !cell.is_error {
                     if let Some(s) = &cell.string {
@@ -278,7 +278,11 @@ pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: 
 ///
 /// # Returns
 /// `true` if a cycle is detected, `false` otherwise.
-pub fn check_cycle(avl_tree: &std::collections::HashMap<i32, i32>,cell1: &CellInfo,cell2: &CellInfo,) -> bool {
+pub fn check_cycle(
+    avl_tree: &std::collections::HashMap<i32, i32>,
+    cell1: &CellInfo,
+    cell2: &CellInfo,
+) -> bool {
     let key1 = cell1.col as i32 * 1000 + cell1.row as i32;
     if avl_tree.contains_key(&key1) {
         return true;
@@ -302,12 +306,20 @@ pub fn check_cycle(avl_tree: &std::collections::HashMap<i32, i32>,cell1: &CellIn
 ///
 /// # Returns
 /// `true` if a cycle is detected, `false` otherwise.
-pub fn check_cycle_range_funcs(avl_tree: &std::collections::HashMap<i32, i32>, cell1: &CellInfo, cell2: &CellInfo) -> bool {
+pub fn check_cycle_range_funcs(
+    avl_tree: &std::collections::HashMap<i32, i32>,
+    cell1: &CellInfo,
+    cell2: &CellInfo,
+) -> bool {
     for (&key, _) in avl_tree.iter() {
         let col = key / 1000;
         let row = key % 1000;
 
-        if col >= cell1.col as i32 && col <= cell2.col as i32 && row >= cell1.row as i32 && row <= cell2.row as i32 {
+        if col >= cell1.col as i32
+            && col <= cell2.col as i32
+            && row >= cell1.row as i32
+            && row <= cell2.row as i32
+        {
             return true;
         }
     }
@@ -320,19 +332,21 @@ pub fn check_cycle_range_funcs(avl_tree: &std::collections::HashMap<i32, i32>, c
 /// * `row` - The row index of the cell.
 /// * `col` - The column index of the cell.
 /// * `sleep_timer` - A mutable reference to track accumulated sleep time.
-pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut i32) { 
-    
+pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut i32) {
     let (op_code, cell1, cell2) = {
-        let c = sheet.data.get_mut(&(row as i16, col as i16)).expect("not in map");
+        let c = sheet
+            .data
+            .get_mut(&(row as i16, col as i16))
+            .expect("not in map");
         (c.op_code, c.cell1.clone(), c.cell2.clone())
-    }; 
+    };
     if op_code == NoConstraint || op_code == String {
         return;
     }
 
     // ── 2) Compute the new value, error flag, and any sleep delta using *only* immutable borrows ──
     let (new_value, string_value, is_error, is_error2) = {
-        // Immutable borrow of the whole sheet  
+        // Immutable borrow of the whole sheet
         let mut err = false;
         let mut val = 0;
         let mut strval = String::new();
@@ -343,12 +357,11 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 let ref_cell = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
                 if ref_cell.is_error {
                     err = true;
-                }else if ref_cell.string.is_some(){
-                                       strval = ref_cell.string.as_ref().unwrap().clone();
-                                   }else{
-                                         val = ref_cell.value;
-                               }
-                
+                } else if ref_cell.string.is_some() {
+                    strval = ref_cell.string.as_ref().unwrap().clone();
+                } else {
+                    val = ref_cell.value;
+                }
             }
             CellPlusCell | CellMinusCell | CellTimesCell | CellDivideCell => {
                 let (a_value, a_is_error, a_string) = {
@@ -365,12 +378,18 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                     (val, err1) = compute_cell(op_code, a_value, b_value, &mut String::new());
                 }
             }
-            CellPlusConstant | CellMinusConstant | CellTimesConstant | CellDivideConstant | ConstantDividesCell |ConstantMinusCell => {
+            CellPlusConstant | CellMinusConstant | CellTimesConstant | CellDivideConstant
+            | ConstantDividesCell | ConstantMinusCell => {
                 let a = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
                 if a.is_error || a.string.is_some() {
                     err = true;
                 } else {
-                    (val, err1) = compute_cell(op_code, a.value, (cell2.row as i32) << 16 | cell2.col as i32, &mut String::new());
+                    (val, err1) = compute_cell(
+                        op_code,
+                        a.value,
+                        (cell2.row as i32) << 16 | cell2.col as i32,
+                        &mut String::new(),
+                    );
                 }
             }
             Sleep => {
@@ -383,45 +402,48 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 }
             }
             Sum | Min | Max | Avg | Stdev => {
-                // range check 
-                    for i in cell1.row..=cell2.row {
-                        for j in cell1.col..=cell2.col {
-                            if let Some(ref_cell) = sheet.data.get(&(i , j)) {
-                                if ref_cell.is_error || ref_cell.string.is_some() {
-                                    err = true;
-                                    break;
-                                }
+                // range check
+                for i in cell1.row..=cell2.row {
+                    for j in cell1.col..=cell2.col {
+                        if let Some(ref_cell) = sheet.data.get(&(i, j)) {
+                            if ref_cell.is_error || ref_cell.string.is_some() {
+                                err = true;
+                                break;
                             }
                         }
-                        if err { break; }
                     }
-                     
-                    if !err{
-                        val = compute_range_func(
-                            sheet, op_code,
-                            cell1.row , cell1.col ,
-                            cell2.row , cell2.col ,
-                            &mut String::new()
-                        );
+                    if err {
+                        break;
                     }
-                    
+                }
+
+                if !err {
+                    val = compute_range_func(
+                        sheet,
+                        op_code,
+                        cell1.row,
+                        cell1.col,
+                        cell2.row,
+                        cell2.col,
+                        &mut String::new(),
+                    );
+                }
             }
             _ => {}
         }
-        (val,strval,err, err1)
+        (val, strval, err, err1)
     };
     {
-        let c = get_or_create_cell(sheet, row as i32, col as i32); 
+        let c = get_or_create_cell(sheet, row as i32, col as i32);
         c.is_error = is_error;
         if is_error2 {
             c.is_error = true;
+        } else if op_code == CellEqualsCell && !string_value.is_empty() {
+            c.string = Some(string_value.clone());
+        } else {
+            c.value = new_value;
+            c.string = None;
         }
-        else if op_code == CellEqualsCell && !string_value.is_empty() {
-             c.string = Some(string_value.clone());
-         } else{
-             c.value  = new_value;
-             c.string = None;
-         }
     }
 }
 
@@ -433,7 +455,10 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
 ///
 /// # Returns
 /// A vector of cell keys in topological order.
-pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, sheet: &Sheet) -> Vec<i32> {
+pub fn topological_sort(
+    avl_tree: &mut std::collections::HashMap<i32, i32>,
+    sheet: &Sheet,
+) -> Vec<i32> {
     let mut queue = std::collections::VecDeque::new();
     let mut result = Vec::new();
 
@@ -447,20 +472,29 @@ pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, shee
     while let Some(node) = queue.pop_front() {
         result.push(node);
 
-        for &dep in &sheet.data.get(&((node % 1000) as i16, (node / 1000 )as i16)).expect("not in map").dependencies {
+        for &dep in &sheet
+            .data
+            .get(&((node % 1000) as i16, (node / 1000) as i16))
+            .expect("not in map")
+            .dependencies
+        {
             if let Some(indegree) = avl_tree.get_mut(&dep) {
-            *indegree -= 1;
+                *indegree -= 1;
                 if *indegree == 0 {
                     queue.push_back(dep);
                 }
             }
         }
         // get the range dependencies
-        let (row,col) = (node % 1000, node / 1000);
+        let (row, col) = (node % 1000, node / 1000);
         if sheet.buul[row as usize][col as usize] {
-            for (((start_col,start_row),(end_col,end_row)), target_vector) in sheet.tuup.iter() {
+            for (((start_col, start_row), (end_col, end_row)), target_vector) in sheet.tuup.iter() {
                 for (target_col, target_row) in target_vector {
-                    if col >= *start_col as i32 && col <= *end_col as i32 && row >= *start_row as i32 && row <= *end_row as i32 {
+                    if col >= *start_col as i32
+                        && col <= *end_col as i32
+                        && row >= *start_row as i32
+                        && row <= *end_row as i32
+                    {
                         let key = *target_col as i32 * 1000 + *target_row as i32;
                         if let Some(indegree) = avl_tree.get_mut(&key) {
                             *indegree -= 1;
@@ -474,7 +508,7 @@ pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, shee
         }
     }
     result
-} 
+}
 
 use OpCode::*;
 
@@ -488,8 +522,13 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
     let col = cell.col as i32;
 
     // Check if the current cell exists in the map
-    let (op_code, cell1, cell2) = if let Some(curr_cell) = sheet.data.get(&(row as i16, col as i16)) {
-        (curr_cell.op_code, curr_cell.cell1.clone(), curr_cell.cell2.clone())
+    let (op_code, cell1, cell2) = if let Some(curr_cell) = sheet.data.get(&(row as i16, col as i16))
+    {
+        (
+            curr_cell.op_code,
+            curr_cell.cell1.clone(),
+            curr_cell.cell2.clone(),
+        )
     } else {
         // If the cell is not in the map, return early
         return;
@@ -497,24 +536,36 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
 
     match op_code {
         OpCode::NoConstraint => {}
-        OpCode::CellEqualsCell| OpCode::CellPlusConstant| OpCode::CellTimesConstant| OpCode::CellMinusConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell| OpCode::Sleep |OpCode::ConstantMinusCell => {
-            if let Some(dependent_cell) = sheet.data.get_mut(&(cell1.row , cell1.col )) {
+        OpCode::CellEqualsCell
+        | OpCode::CellPlusConstant
+        | OpCode::CellTimesConstant
+        | OpCode::CellMinusConstant
+        | OpCode::CellDivideConstant
+        | OpCode::ConstantDividesCell
+        | OpCode::Sleep
+        | OpCode::ConstantMinusCell => {
+            if let Some(dependent_cell) = sheet.data.get_mut(&(cell1.row, cell1.col)) {
                 dependent_cell.dependencies.remove(&(col * 1000 + row));
-            } 
+            }
         }
         OpCode::Sum | OpCode::Min | OpCode::Max | OpCode::Avg | OpCode::Stdev => {
             // Handle range dependencies
-            if let Some(vec) = sheet.tuup.get_mut(&((cell1.col, cell1.row), (cell2.col, cell2.row))) {
+            if let Some(vec) = sheet
+                .tuup
+                .get_mut(&((cell1.col, cell1.row), (cell2.col, cell2.row)))
+            {
                 vec.retain(|&(col, row)| col != cell.col || row != cell.row);
                 if vec.is_empty() {
-                    sheet.tuup.remove(&((cell1.col, cell1.row), (cell2.col, cell2.row)));
+                    sheet
+                        .tuup
+                        .remove(&((cell1.col, cell1.row), (cell2.col, cell2.row)));
                 }
             }
             for i in cell1.row..=cell2.row {
                 for j in cell1.col..=cell2.col {
                     let mut flag = false;
                     // check present in other range functions
-                    for(((start_col,start_row),(end_col,end_row)), _) in sheet.tuup.iter() {
+                    for (((start_col, start_row), (end_col, end_row)), _) in sheet.tuup.iter() {
                         if j >= *start_col && j <= *end_col && i >= *start_row && i <= *end_row {
                             flag = true;
                         }
@@ -523,12 +574,15 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
                 }
             }
         }
-        OpCode::CellPlusCell| OpCode::CellMinusCell| OpCode::CellTimesCell| OpCode::CellDivideCell => {
-            if let Some(dependent_cell1) = sheet.data.get_mut(&(cell1.row , cell1.col )) {
+        OpCode::CellPlusCell
+        | OpCode::CellMinusCell
+        | OpCode::CellTimesCell
+        | OpCode::CellDivideCell => {
+            if let Some(dependent_cell1) = sheet.data.get_mut(&(cell1.row, cell1.col)) {
                 dependent_cell1.dependencies.remove(&(col * 1000 + row));
             }
 
-            if let Some(dependent_cell2) = sheet.data.get_mut(&(cell2.row , cell2.col )) {
+            if let Some(dependent_cell2) = sheet.data.get_mut(&(cell2.row, cell2.col)) {
                 dependent_cell2.dependencies.remove(&(col * 1000 + row));
             }
         }
@@ -547,29 +601,36 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
 /// * `avl_tree` - The HashMap tracking cell dependencies and their indegrees.
 /// * `cell` - The cell to add to the tree.
 /// * `sheet` - The spreadsheet containing the cell data.
-pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: CellInfo, sheet: &Sheet) {
+pub fn add_to_tree(
+    avl_tree: &mut std::collections::HashMap<i32, i32>,
+    cell: CellInfo,
+    sheet: &Sheet,
+) {
     // Get the current cell from the HashMap
-    if let Some(curr_cell) = sheet.data.get(&(cell.row , cell.col )) {
+    if let Some(curr_cell) = sheet.data.get(&(cell.row, cell.col)) {
         for &curr in &curr_cell.dependencies {
             if let std::collections::hash_map::Entry::Vacant(e) = avl_tree.entry(curr) {
-                           e.insert(1);
-                               let temp = CellInfo {
-                                row: (curr % 1000) as i16,
-                                col: (curr / 1000) as i16,
-                            };
-                            add_to_tree(avl_tree, temp, sheet);
-                        } else {
-                            *avl_tree.entry(curr).or_insert(1) += 1;
-                        }
+                e.insert(1);
+                let temp = CellInfo {
+                    row: (curr % 1000) as i16,
+                    col: (curr / 1000) as i16,
+                };
+                add_to_tree(avl_tree, temp, sheet);
+            } else {
+                *avl_tree.entry(curr).or_insert(1) += 1;
+            }
         }
-    }// check range dependency
-    if sheet.buul[cell.row as usize][cell.col as usize]{
+    } // check range dependency
+    if sheet.buul[cell.row as usize][cell.col as usize] {
         // range dependency is there
-        for (((start_col,start_row),(end_col,end_row)), target_vector) in sheet.tuup.iter() {
-
-            if cell.col >= *start_col && cell.col <= *end_col && cell.row >= *start_row && cell.row <= *end_row {
+        for (((start_col, start_row), (end_col, end_row)), target_vector) in sheet.tuup.iter() {
+            if cell.col >= *start_col
+                && cell.col <= *end_col
+                && cell.row >= *start_row
+                && cell.row <= *end_row
+            {
                 for (target_col, target_row) in target_vector {
-                // dependent
+                    // dependent
                     let key = *target_col as i32 * 1000 + *target_row as i32;
                     if let std::collections::hash_map::Entry::Vacant(e) = avl_tree.entry(key) {
                         e.insert(1);
@@ -597,7 +658,15 @@ pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: Cel
 /// * `sheet` - The mutable spreadsheet to operate on.
 /// * `status` - A mutable string to store the operation status (e.g., "ok" or "circular error").
 /// * `sleep_timer` - A mutable reference to track accumulated sleep time.
-pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_code: OpCode,sheet: &mut Sheet,status: &mut String,sleep_timer: &mut i32,) {
+pub fn add_constraints(
+    curr_cell: CellInfo,
+    cell1: CellInfo,
+    cell2: CellInfo,
+    op_code: OpCode,
+    sheet: &mut Sheet,
+    status: &mut String,
+    sleep_timer: &mut i32,
+) {
     let key = curr_cell.col as i32 * 1000 + curr_cell.row as i32;
     let mut ans = 0;
     let mut calc_error = false;
@@ -607,26 +676,30 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(key, 0);
     let temp = CellInfo { row: -1, col: -1 };
-    add_to_tree(&mut avl_tree, curr_cell.clone(), sheet); 
+    add_to_tree(&mut avl_tree, curr_cell.clone(), sheet);
     match op_code {
-        OpCode::NoConstraint | String => {remove_dependency(&curr_cell, sheet);
-            let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32); 
-                ans = cell.value;
-                if cell.is_error {calc_error = true;}
-                cell.op_code = op_code;
-                cell.cell1 = CellInfo { row: -1, col: -1 };
-                cell.cell2 = CellInfo { row: -1, col: -1 }; 
+        OpCode::NoConstraint | String => {
+            remove_dependency(&curr_cell, sheet);
+            let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32);
+            ans = cell.value;
+            if cell.is_error {
+                calc_error = true;
+            }
+            cell.op_code = op_code;
+            cell.cell1 = CellInfo { row: -1, col: -1 };
+            cell.cell2 = CellInfo { row: -1, col: -1 };
         }
         OpCode::CellEqualsCell => {
             if check_cycle(&avl_tree, &cell1, &temp) {
-                *status = String::from("circular error");return;
+                *status = String::from("circular error");
+                return;
             }
             remove_dependency(&curr_cell, sheet);
-            let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32); 
+            let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32);
             cell.cell1 = cell1.clone();
             cell.cell2 = CellInfo { row: -1, col: -1 };
             cell.op_code = op_code;
-            let ref_cell = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32); 
+            let ref_cell = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
             match (&ref_cell.string, ref_cell.is_error) {
                 (_, true) => calc_error = true,
                 (Some(s), false) => stringans = s.clone(),
@@ -636,10 +709,11 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
         }
         OpCode::Sleep => {
             if check_cycle(&avl_tree, &cell1, &temp) {
-                *status = String::from("circular error");return;
+                *status = String::from("circular error");
+                return;
             }
             remove_dependency(&curr_cell, sheet);
-            let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32); 
+            let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32);
             cell.cell1 = cell1.clone();
             cell.cell2 = CellInfo { row: -1, col: -1 };
             cell.op_code = op_code;
@@ -647,7 +721,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             let temp2 = sheet.cols;
             sheet.rows = temp;
             sheet.cols = temp2;
-            
+
             let ref_cell = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
             calc_error = ref_cell.is_error || ref_cell.string.is_some();
             if !calc_error {
@@ -656,9 +730,15 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             }
             ref_cell.dependencies.insert(key);
         }
-        OpCode::CellPlusConstant| OpCode::CellMinusConstant| OpCode::CellTimesConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell |OpCode ::ConstantMinusCell=> {
+        OpCode::CellPlusConstant
+        | OpCode::CellMinusConstant
+        | OpCode::CellTimesConstant
+        | OpCode::CellDivideConstant
+        | OpCode::ConstantDividesCell
+        | OpCode::ConstantMinusCell => {
             if check_cycle(&avl_tree, &cell1, &temp) {
-                *status = String::from("circular error");return;
+                *status = String::from("circular error");
+                return;
             }
             remove_dependency(&curr_cell, sheet);
             let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32);
@@ -678,12 +758,13 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
         }
         OpCode::Sum | OpCode::Min | OpCode::Max | OpCode::Avg | OpCode::Stdev => {
             if check_cycle_range_funcs(&avl_tree, &cell1, &cell2) {
-                *status = String::from("circular error");return;
+                *status = String::from("circular error");
+                return;
             }
-            let key1 = (cell1.col , cell1.row );
+            let key1 = (cell1.col, cell1.row);
             let key2 = (cell2.col, cell2.row);
-            if sheet.tuup.contains_key(&(key1,key2)){
-                let vec = sheet.tuup.get(&(key1,key2)).unwrap();
+            if sheet.tuup.contains_key(&(key1, key2)) {
+                let vec = sheet.tuup.get(&(key1, key2)).unwrap();
                 if !vec.is_empty() {
                     let row = vec[0].1;
                     let col = vec[0].0;
@@ -692,13 +773,11 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
                         calc_error = true;
                     }
                 }
-                
-            }
-            else{
+            } else {
                 for i in cell1.row..=cell2.row {
                     for j in cell1.col..=cell2.col {
                         sheet.buul[i as usize][j as usize] = true; // Mark the cell as used
-                        if let Some(ref_cell) = sheet.data.get(&(i , j )) {
+                        if let Some(ref_cell) = sheet.data.get(&(i, j)) {
                             if ref_cell.is_error || ref_cell.string.is_some() {
                                 calc_error = true;
                             }
@@ -707,22 +786,33 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
                 }
             }
             remove_dependency(&curr_cell, sheet);
-            if let Some(existing) = sheet.tuup.get_mut(&((cell1.col, cell1.row), (cell2.col, cell2.row))) {
+            if let Some(existing) = sheet
+                .tuup
+                .get_mut(&((cell1.col, cell1.row), (cell2.col, cell2.row)))
+            {
                 existing.push((curr_cell.col, curr_cell.row));
             } else {
-                sheet.tuup.insert(((cell1.col, cell1.row), (cell2.col, cell2.row)), vec![(curr_cell.col, curr_cell.row)]);
+                sheet.tuup.insert(
+                    ((cell1.col, cell1.row), (cell2.col, cell2.row)),
+                    vec![(curr_cell.col, curr_cell.row)],
+                );
             }
             let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32);
             cell.cell1 = cell1.clone();
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
-            ans = compute_range_func(sheet,op_code,cell1.row ,cell1.col ,cell2.row ,cell2.col ,status,);
-        
+            ans = compute_range_func(
+                sheet, op_code, cell1.row, cell1.col, cell2.row, cell2.col, status,
+            );
         }
 
-        OpCode::CellPlusCell| OpCode::CellMinusCell| OpCode::CellTimesCell| OpCode::CellDivideCell => {
+        OpCode::CellPlusCell
+        | OpCode::CellMinusCell
+        | OpCode::CellTimesCell
+        | OpCode::CellDivideCell => {
             if check_cycle(&avl_tree, &cell1, &cell2) {
-                *status = String::from("circular error");return;
+                *status = String::from("circular error");
+                return;
             }
             remove_dependency(&curr_cell, sheet);
             let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32);
@@ -747,7 +837,8 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             if a_is_error || b_is_error || a_string.is_some() || b_string.is_some() {
                 calc_error = true;
             } else {
-                let (computed_value, computed_error) = compute_cell(op_code, a_value, b_value, status);
+                let (computed_value, computed_error) =
+                    compute_cell(op_code, a_value, b_value, status);
                 ans = computed_value;
                 calc_error1 = computed_error;
             }
@@ -761,10 +852,9 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
                 let b = get_or_create_cell(sheet, cell2.row as i32, cell2.col as i32);
                 b.dependencies.insert(key);
             }
-            
         }
     }
-    let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32); 
+    let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32);
     cell.is_error = calc_error || calc_error1;
     if !cell.is_error && cell.op_code != OpCode::String {
         cell.value = ans;
@@ -773,15 +863,14 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
     if op_code == OpCode::CellEqualsCell && !stringans.is_empty() {
         cell.string = Some(stringans.clone());
     }
-    let sorted = topological_sort(&mut avl_tree, sheet); 
-    *status = String::from("ok");  
+    let sorted = topological_sort(&mut avl_tree, sheet);
+    *status = String::from("ok");
     for i in sorted.into_iter() {
         let row = i % 1000;
         let col = i / 1000;
         if row == curr_cell.row as i32 && col == curr_cell.col as i32 {
             continue;
         }
-        recalculate(sheet, row as usize, col as usize, sleep_timer); 
+        recalculate(sheet, row as usize, col as usize, sleep_timer);
     }
-     
 }

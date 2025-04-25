@@ -12,7 +12,6 @@ pub struct Theme {
     pub header_text_color: Color32,
 }
 
-
 pub const THEMES: [Theme; 6] = [
     Theme {
         name: "Dark",
@@ -67,12 +66,11 @@ pub const THEMES: [Theme; 6] = [
     Theme {
         name: "Cyberpunk Noir",
         is_light_theme: false,
-        cell_bg: Color32::from_rgb(15, 5, 25),             
-        selected_cell_bg: Color32::from_rgb(55, 0, 70),    
-        header_bg: Color32::from_rgb(90, 0, 120),          
-        grid_line_color: Color32::from_rgb(255, 0, 128),   
-        text_color: Color32::from_rgb(180, 130, 255),      
-        header_text_color: Color32::from_rgb(255, 150, 200), 
+        cell_bg: Color32::from_rgb(15, 5, 25),
+        selected_cell_bg: Color32::from_rgb(55, 0, 70),
+        header_bg: Color32::from_rgb(90, 0, 120),
+        grid_line_color: Color32::from_rgb(255, 0, 128),
+        text_color: Color32::from_rgb(180, 130, 255),
+        header_text_color: Color32::from_rgb(255, 150, 200),
     },
 ];
-

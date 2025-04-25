@@ -1,12 +1,13 @@
-
+use crate::sheet_functions::OpCode;
+use crate::sheet_functions::{Cell, Sheet};
+use crate::sheet_functions::{
+    CellInfo, add_to_tree, col_name_to_col_num, recalculate, topological_sort,
+};
+use serde::de;
+use serde::ser::SerializeTuple;
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::SeqAccess, de::Visitor};
 use std::collections::HashSet;
 use std::fmt;
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Visitor, de::SeqAccess};
-use serde::de;
-use crate::sheet_functions::{Sheet, Cell};
-use crate::sheet_functions::OpCode;
-use crate::sheet_functions::{col_name_to_col_num, add_to_tree, topological_sort, recalculate, CellInfo};
-use serde::ser::SerializeTuple;
 
 // impl Serialize for CellInfo {
 //     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -95,14 +96,25 @@ use serde::ser::SerializeTuple;
 //         deserializer.deserialize_tuple(7, CellVisitor)
 //     }
 // }
-        
 
-pub fn update_dependencies(old_cell_row: i16,old_cell_col: i16,new_cell_row: i16,new_cell_col: i16,sheet: &mut Sheet,
+pub fn update_dependencies(
+    old_cell_row: i16,
+    old_cell_col: i16,
+    new_cell_row: i16,
+    new_cell_col: i16,
+    sheet: &mut Sheet,
 ) {
     // Goes to the dependency set of cells depending on the old cell and updates references
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(new_cell_col as i32 * 1000 + new_cell_row as i32, 0);
-    add_to_tree(&mut avl_tree,CellInfo {row: new_cell_row,col: new_cell_col,},sheet,);
+    add_to_tree(
+        &mut avl_tree,
+        CellInfo {
+            row: new_cell_row,
+            col: new_cell_col,
+        },
+        sheet,
+    );
 
     let sorted = topological_sort(&mut avl_tree, sheet);
 
@@ -135,11 +147,19 @@ pub fn update_dependencies(old_cell_row: i16,old_cell_col: i16,new_cell_row: i16
                     };
                 }
             }
-        }  
+        }
     }
 }
 
-pub fn change_dependecy_set(  new_cell: &mut Cell, sheet: &mut Sheet, del_range_dependencies: bool, change_to_row: i16,  change_to_col: i16,current_row: i16,current_col: i16,) {
+pub fn change_dependecy_set(
+    new_cell: &mut Cell,
+    sheet: &mut Sheet,
+    del_range_dependencies: bool,
+    change_to_row: i16,
+    change_to_col: i16,
+    current_row: i16,
+    current_col: i16,
+) {
     // Removes the range/non-range dependencies in the given dependency set
     for &dependency in new_cell.dependencies.clone().iter() {
         let row = dependency % 1000;
@@ -160,30 +180,33 @@ pub fn change_dependecy_set(  new_cell: &mut Cell, sheet: &mut Sheet, del_range_
             {
                 new_cell.dependencies.remove(&(col * 1000 + row));
 
-                if dependent_cell.cell1.row == current_row && dependent_cell.cell1.col == current_col {
+                if dependent_cell.cell1.row == current_row
+                    && dependent_cell.cell1.col == current_col
+                {
                     dependent_cell.cell1 = CellInfo {
                         row: change_to_row,
                         col: change_to_col,
                     };
                 }
-                if dependent_cell.cell2.row == current_row && dependent_cell.cell2.col == current_col {
+                if dependent_cell.cell2.row == current_row
+                    && dependent_cell.cell2.col == current_col
+                {
                     dependent_cell.cell2 = CellInfo {
                         row: change_to_row,
                         col: change_to_col,
                     };
                 }
             }
-        }  
+        }
     }
 }
-
 
 pub fn recalculate_dependecy(curr_cell: CellInfo, sheet: &mut Sheet) {
     let mut dependency_set = std::collections::HashMap::new();
     dependency_set.insert(curr_cell.col as i32 * 1000 + curr_cell.row as i32, 0);
     add_to_tree(&mut dependency_set, curr_cell.clone(), sheet);
     let sorted = topological_sort(&mut dependency_set, sheet);
-    for i in sorted.into_iter(){
+    for i in sorted.into_iter() {
         let row = i % 1000;
         let col = i / 1000;
         if row == curr_cell.row as i32 && col == curr_cell.col as i32 {
@@ -192,7 +215,6 @@ pub fn recalculate_dependecy(curr_cell: CellInfo, sheet: &mut Sheet) {
         recalculate(sheet, row as usize, col as usize, &mut 0);
     }
 }
-
 
 pub fn sort_sheet(
     sheet: &mut Sheet,
@@ -262,17 +284,24 @@ pub fn sort_sheet(
         }
     }
 
-    if is_column{
-    for i in row1..=row2 {
-        for j in col1..=col2 {
-            if let Some(cell) = vec.get((i - row1) as usize).and_then(|row| row.get((j - col1) as usize)) {
-                sheet.data.insert((i as i16, j as i16), cell.clone());
+    if is_column {
+        for i in row1..=row2 {
+            for j in col1..=col2 {
+                if let Some(cell) = vec
+                    .get((i - row1) as usize)
+                    .and_then(|row| row.get((j - col1) as usize))
+                {
+                    sheet.data.insert((i as i16, j as i16), cell.clone());
+                }
             }
         }
-    }}else{
+    } else {
         for i in col1..=col2 {
             for j in row1..=row2 {
-                if let Some(cell) = vec.get((i - col1) as usize).and_then(|row| row.get((j - row1) as usize)) {
+                if let Some(cell) = vec
+                    .get((i - col1) as usize)
+                    .and_then(|row| row.get((j - row1) as usize))
+                {
                     sheet.data.insert((j as i16, i as i16), cell.clone());
                 }
             }

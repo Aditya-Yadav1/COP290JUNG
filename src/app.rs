@@ -1,16 +1,15 @@
-use eframe::{egui, App, Frame};
-use crate::{parser, sheet_functions}; 
-use crate::sheet_functions::{Sheet, col_num_to_col_name,col_name_to_col_num, OpCode,get_or_create_cell}; 
-use std::string::String;
+use crate::sheet_functions::{
+    OpCode, Sheet, col_name_to_col_num, col_num_to_col_name, get_or_create_cell,
+};
 use crate::ui::app_impl::*;
 use crate::ui::menu;
-use crate::ui::sheet_display; 
-use crate::ui::utils::{get_cell_formula,sort_add_to_stack,sort_extension};
-
-
+use crate::ui::sheet_display;
+use crate::ui::utils::{get_cell_formula, sort_add_to_stack, sort_extension};
+use crate::{parser, sheet_functions};
+use eframe::{App, Frame, egui};
+use std::string::String;
 
 // use clonne
-
 
 impl Default for SpreadsheetApp {
     fn default() -> Self {
@@ -22,19 +21,18 @@ impl Default for SpreadsheetApp {
         SpreadsheetApp::new(sheets)
     }
 }
- 
 
 impl App for SpreadsheetApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) { 
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
         if self.theme.is_light_theme {
             ctx.set_visuals(egui::Visuals::light());
         } else {
             ctx.set_visuals(egui::Visuals::dark());
         }
-        
+
         let visible_rows = 18;
         let visible_cols = 10;
-        
+
         let mut entered = None;
 
         egui::TopBottomPanel::top("formula_bar").show(ctx, |ui| {
@@ -50,12 +48,12 @@ impl App for SpreadsheetApp {
                 ui.separator();
                 ui.label("Selected Cell:");
                 if let Some((r, c)) = self.selected_cell {
-                    let get_cell = get_or_create_cell(&mut self.sheets[self.current_sheet_index].sheet, r as i32, c as i32);
-                    let temp = get_cell_formula(
-                        r as i16,
-                        c as i16,
-                        get_cell,
+                    let get_cell = get_or_create_cell(
+                        &mut self.sheets[self.current_sheet_index].sheet,
+                        r as i32,
+                        c as i32,
                     );
+                    let temp = get_cell_formula(r as i16, c as i16, get_cell);
                     ui.label(format!("Formula: {}", temp));
                 } else {
                     ui.label("No cell is selected");
@@ -91,7 +89,7 @@ impl App for SpreadsheetApp {
                         ui.label("Enter number of columns:"); 
                         let _cols = ui.text_edit_singleline(&mut self.new_sheet_cols);
                         ui.label("Enter sheet name:");
-                        let _name = ui.text_edit_singleline(&mut self.new_sheet_name); 
+                        let _name = ui.text_edit_singleline(&mut self.new_sheet_name);
                         ui.horizontal(|ui| {
                             if ui.button("Create").clicked() {
                                 if self.new_sheet_rows.is_empty() || self.new_sheet_cols.is_empty() {
@@ -137,10 +135,8 @@ impl App for SpreadsheetApp {
                         ui.label("Are you sure you want to delete this sheet?");
                         if ui.button("Delete").clicked() { 
                             self.redo_stack.clear();
-                            
                             self.sheets.remove(self.current_sheet_index);
                             self.current_sheet_index = self.sheets.len().saturating_sub(1);
-                        
                             self.show_menu = Menu::None;
                             self.status = String::from("Sheet deleted");
                         }
@@ -162,8 +158,12 @@ impl App for SpreadsheetApp {
                 ui.separator();
                 ui.label(format!("Time: {:.1}", self.time));
                 ui.separator();
-                ui.label(format!("View: Row {} Col {}", self.row_start + 1, col_num_to_col_name(self.col_start)));
-                
+                ui.label(format!(
+                    "View: Row {} Col {}",
+                    self.row_start + 1,
+                    col_num_to_col_name(self.col_start)
+                ));
+
                 if let Some((r, c)) = self.selected_cell {
                     ui.separator();
                     let col_name = col_num_to_col_name(c as i32);
@@ -176,7 +176,7 @@ impl App for SpreadsheetApp {
         let input = ctx.input(|i| i.clone());
         let visible_rows = 20;
         let visible_cols = 15;
-        
+
         if input.modifiers.ctrl && input.key_pressed(egui::Key::Z) {
             self.undo();
             ctx.request_repaint();
@@ -204,15 +204,15 @@ impl App for SpreadsheetApp {
             self.status = "Cut".to_string();
             ctx.request_repaint();
         }
-        if input.modifiers.alt && input.key_pressed(egui::Key::S){
-            self.show_menu = Menu:: SelectCell;
+        if input.modifiers.alt && input.key_pressed(egui::Key::S) {
+            self.show_menu = Menu::SelectCell;
         }
 
         if input.key_pressed(egui::Key::I) && self.mode == Mode::Normal {
             self.mode = Mode::Insert;
             self.is_editing = false;
         }
-         
+
         if input.key_pressed(egui::Key::Escape) {
             self.mode = Mode::Normal;
             self.selected_cell = None;
@@ -222,54 +222,76 @@ impl App for SpreadsheetApp {
         }
 
         let mut new_selection = self.selected_cell.clone();
-        if let Some((r, c)) = self.selected_cell { 
-            if input.key_pressed(egui::Key::ArrowUp) && r > 0 { new_selection = Some((r - 1, c)); }
-            if input.key_pressed(egui::Key::ArrowDown) && r < self.sheets[self.current_sheet_index].sheet.rows as usize - 1 { new_selection = Some((r + 1, c)); }
-            if input.key_pressed(egui::Key::ArrowLeft) && c > 0 { new_selection = Some((r, c - 1)); }
-            if input.key_pressed(egui::Key::ArrowRight) && c < self.sheets[self.current_sheet_index].sheet.cols as usize - 1 { new_selection = Some((r, c + 1)); }
+        if let Some((r, c)) = self.selected_cell {
+            if input.key_pressed(egui::Key::ArrowUp) && r > 0 {
+                new_selection = Some((r - 1, c));
+            }
+            if input.key_pressed(egui::Key::ArrowDown)
+                && r < self.sheets[self.current_sheet_index].sheet.rows as usize - 1
+            {
+                new_selection = Some((r + 1, c));
+            }
+            if input.key_pressed(egui::Key::ArrowLeft) && c > 0 {
+                new_selection = Some((r, c - 1));
+            }
+            if input.key_pressed(egui::Key::ArrowRight)
+                && c < self.sheets[self.current_sheet_index].sheet.cols as usize - 1
+            {
+                new_selection = Some((r, c + 1));
+            }
         }
         if new_selection != self.selected_cell {
             if self.is_editing {
                 self.is_editing = false;
                 self.editing_value.clear();
             }
-        
+
             self.selected_cell = new_selection;
-        
+
             if let Some((r, c)) = self.selected_cell {
                 let sheet = &self.sheets[self.current_sheet_index].sheet;
-        
+
                 // Clamp scroll bounds to avoid negative ranges
                 let visible_rows = visible_rows.min(sheet.rows);
                 let visible_cols = visible_cols.min(sheet.cols);
-        
+
                 // Adjust scroll position to keep selected cell in view
                 if (r as i32) < self.row_start {
                     self.row_start = r as i32;
                 } else if (r as i32) >= self.row_start + visible_rows {
                     self.row_start = (r as i32) - visible_rows + 1;
                 }
-        
+
                 if (c as i32) < self.col_start {
                     self.col_start = c as i32;
                 } else if (c as i32) >= self.col_start + visible_cols {
                     self.col_start = (c as i32) - visible_cols + 1;
                 }
-        
+
                 // Don't allow scrolling beyond bounds (with saturating_sub)
                 let max_row_start = sheet.rows.saturating_sub(visible_rows);
                 let max_col_start = sheet.cols.saturating_sub(visible_cols);
-        
+
                 self.row_start = self.row_start.clamp(0, max_row_start);
                 self.col_start = self.col_start.clamp(0, max_col_start);
             }
         }
 
         if self.mode == Mode::Normal {
-            if input.key_pressed(egui::Key::H) {self.col_start = (self.col_start - 1).max(0);}
-            if input.key_pressed(egui::Key::L) {self.col_start = (self.col_start + 1).min(self.sheets[self.current_sheet_index].sheet.cols - 1);}
-            if input.key_pressed(egui::Key::K) {self.row_start = (self.row_start - 1).max(0);}
-            if input.key_pressed(egui::Key::J) {self.row_start = (self.row_start + 1).min(self.sheets[self.current_sheet_index].sheet.rows - 1);}
+            if input.key_pressed(egui::Key::H) {
+                self.col_start = (self.col_start - 1).max(0);
+            }
+            if input.key_pressed(egui::Key::L) {
+                self.col_start =
+                    (self.col_start + 1).min(self.sheets[self.current_sheet_index].sheet.cols - 1);
+            }
+            if input.key_pressed(egui::Key::K) {
+                self.row_start = (self.row_start - 1).max(0);
+            }
+            if input.key_pressed(egui::Key::J) {
+                self.row_start =
+                    (self.row_start + 1).min(self.sheets[self.current_sheet_index].sheet.rows - 1);
+            }
         }
 
         if let Some(cmd) = entered {
@@ -286,8 +308,14 @@ impl App for SpreadsheetApp {
                     let col = sheet_functions::col_name_to_col_num(col_name);
                     let row = row - 1;
                     if sheet_functions::is_valid_cell(row, col, sheet_rows, sheet_cols) {
-                        let old_cell = get_or_create_cell(&mut self.sheets[self.current_sheet_index].sheet,row as i32,col as i32).clone();
-                        cell_edit_action = Some((row as usize, col as usize, old_cell, cmd.clone()));
+                        let old_cell = get_or_create_cell(
+                            &mut self.sheets[self.current_sheet_index].sheet,
+                            row as i32,
+                            col as i32,
+                        )
+                        .clone();
+                        cell_edit_action =
+                            Some((row as usize, col as usize, old_cell, cmd.clone()));
                     }
                 }
             }
@@ -300,15 +328,17 @@ impl App for SpreadsheetApp {
                     let ref_row1: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
                     let ref_col2 = caps.get(3).unwrap().as_str();
                     let ref_row2: i32 = caps.get(4).unwrap().as_str().parse().unwrap();
-                    let sort_key = caps.get(5).unwrap().as_str(); 
+                    let sort_key = caps.get(5).unwrap().as_str();
                     let sort_order = caps.get(6).unwrap().as_str();
-            
+
                     let is_column = sort_key.chars().all(|c| c.is_ascii_alphabetic());
                     let col1 = col_name_to_col_num(ref_col1);
                     let row1 = ref_row1 - 1;
                     let col2 = col_name_to_col_num(ref_col2);
                     let row2 = ref_row2 - 1;
-                    sort_extension(col1,row1,col2,row2,sort_key,is_column,sort_order,self);
+                    sort_extension(
+                        col1, row1, col2, row2, sort_key, is_column, sort_order, self,
+                    );
                     self.status = String::from("Sorted");
                     self.time = 0.0;
                 }
@@ -326,8 +356,8 @@ impl App for SpreadsheetApp {
                 &mut true,
             );
 
-            if let Some((row, col, old_cell, _)) = cell_edit_action { 
-               //ku
+            if let Some((row, col, old_cell, _)) = cell_edit_action {
+                //ku
                 self.undo_stack.push(Action::Inserted {
                     sheet_index: self.current_sheet_index,
                     row: row as i16,
@@ -337,7 +367,7 @@ impl App for SpreadsheetApp {
                 self.redo_stack.clear();
             }
         }
-        
+
         ctx.request_repaint();
     }
 }

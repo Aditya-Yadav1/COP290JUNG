@@ -1,4 +1,4 @@
-use egui::{FontFamily, FontId, TextStyle}; 
+use egui::{FontFamily, FontId, TextStyle};
 
 #[derive(Clone)]
 pub struct FontOption {
@@ -11,7 +11,7 @@ pub struct FontOption {
 #[derive(Clone, Copy)]
 pub enum FontFamilyType {
     Proportional,
-    Monospace, 
+    Monospace,
 }
 
 pub const FONTS: [FontOption; 2] = [
@@ -34,7 +34,6 @@ impl FontOption {
         match self.family_type {
             FontFamilyType::Proportional => FontFamily::Proportional,
             FontFamilyType::Monospace => FontFamily::Monospace,
-             
         }
     }
 }
@@ -44,19 +43,22 @@ pub fn setup_custom_fonts(ctx: &egui::Context, font_option: &FontOption) {
     let family = font_option.get_family();
 
     if let Some(font_data) = font_option.path {
-        let font_name = match font_option.family_type { 
+        let font_name = match font_option.family_type {
             _ => "custom_font".to_string(),
         };
 
-        fonts.font_data.insert(font_name.clone(), egui::FontData::from_static(font_data));
+        fonts
+            .font_data
+            .insert(font_name.clone(), egui::FontData::from_static(font_data));
 
         match font_option.family_type {
             FontFamilyType::Proportional | FontFamilyType::Monospace => {
-                fonts.families
+                fonts
+                    .families
                     .get_mut(&family)
                     .unwrap()
                     .insert(0, font_name);
-            } 
+            }
         }
     }
 
