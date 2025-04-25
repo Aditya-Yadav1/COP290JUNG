@@ -20,7 +20,6 @@ use crate::sheet_functions::get_or_create_cell;
 ///
 /// # Returns
 /// The corresponding `OpCode` for the operation, or `NoConstraint` for constant operations (like cell = int, string)
-
 pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
     // function to get opcode for the case of int op cell or cell op int
     match op_code {
@@ -33,7 +32,6 @@ pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
 }
 
 /// Maps a character operator to the corresponding `OpCode` for operations between two cells.
-
 pub fn get_op_code2(op_code: char) -> OpCode {
     match op_code {
         '+' => CellPlusCell,
@@ -51,7 +49,6 @@ pub fn get_op_code2(op_code: char) -> OpCode {
 ///
 /// # Returns
 /// The corresponding `OpCode` for the function, or `NoConstraint` if the opcode is not defined.
-
 pub fn func_to_op_code(func: &str) -> OpCode {
     // function for getting opcode for the case of func(cell:cell)
     match func {
@@ -68,7 +65,6 @@ pub fn func_to_op_code(func: &str) -> OpCode {
 ///
 /// # Arguments
 /// * `command` - The mutable string to process.
-
 fn remove_space(command: &mut String) {
     *command = command.chars().filter(|&c| c != ' ').collect();
 }
@@ -85,7 +81,7 @@ fn remove_space(command: &mut String) {
 /// * `total_cols` - The total number of columns in the spreadsheet.
 /// * `sheet` - The mutable spreadsheet to operate on.
 /// * `print_enabled` - A mutable boolean indicating whether output printing is enabled.
-
+#[allow(clippy::too_many_arguments)]
 pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:&mut f32, status:&mut String, total_rows:&i32, total_cols:&i32, sheet: &mut Sheet,print_enabled : &mut bool){
     let mut command = command.trim().to_string();
     let mut sleep_timer = 0;
@@ -162,8 +158,8 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             if op=='+'{ value = val1 + val2;  }
             else if op =='-'{  value = val1 - val2;  }
             else if op =='*'{  value = val1 * val2;  }
-            else{ if val2 == 0 {calc_error=true;  value= -1;}
-                else{  value = val1 / val2; }}
+            else if val2 == 0 {calc_error=true;  value= -1;}
+            else{  value = val1 / val2; }
 
             let cell_entry = get_or_create_cell(sheet, row, col);
             cell_entry.value = value;
@@ -215,11 +211,11 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let val_row1  = caps.get(6).unwrap().as_str().parse::<i32>().unwrap();
         
         let col  = col_name_to_col_num(ref_col) ;
-        let row  = ref_row as i32 - 1;
+        let row  = ref_row - 1;
         let col1   = col_name_to_col_num(val_col1)  ;
         
-        if is_valid_cell(row as i32, col as i32, *total_rows, *total_cols) &&  (op == '+' || op == '-' || op == '*' || op == '/')&&
-            is_valid_cell(val_row1 - 1, col1 as i32, *total_rows, *total_cols)  { 
+        if is_valid_cell(row , col, *total_rows, *total_cols) &&  (op == '+' || op == '-' || op == '*' || op == '/')&&
+            is_valid_cell(val_row1 - 1, col1 , *total_rows, *total_cols)  { 
             // Splitting the constant into two 16 bit variables
             let const1 = val1 & 0xFFFF;
             let const2 = (val1 >> 16) & 0xFFFF;
@@ -289,7 +285,7 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
-        let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap_or_else(|_| {*status = String::from("Invalid cmd");return 0;});
+        let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap_or_else(|_| {*status = String::from("Invalid cmd"); 0});
         
         let col = col_name_to_col_num(ref_col);
         let row = ref_row - 1; 
