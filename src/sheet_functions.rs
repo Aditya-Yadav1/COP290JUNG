@@ -420,19 +420,21 @@ pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: Cel
         // range dependency is there
         for (((start_col,start_row),(end_col,end_row)), target_vector) in sheet.tuup.iter() {
 
-            for (target_col, target_row) in target_vector {
             if cell.col >= *start_col && cell.col <= *end_col && cell.row >= *start_row && cell.row <= *end_row {
-               // dependent
-                let key = *target_col as i32 * 1000 + *target_row as i32;
-                if !avl_tree.contains_key(&key) {
-                    avl_tree.insert(key, 1);
-                    let temp = CellInfo {
-                        row: *target_row,
-                        col: *target_col,
-                    };
-                    add_to_tree(avl_tree, temp, sheet);
-                } else {*avl_tree.entry(key).or_insert(1) += 1;}
-            }
+                for (target_col, target_row) in target_vector {
+                // dependent
+                    let key = *target_col as i32 * 1000 + *target_row as i32;
+                    if !avl_tree.contains_key(&key) {
+                        avl_tree.insert(key, 1);
+                        let temp = CellInfo {
+                            row: *target_row,
+                            col: *target_col,
+                        };
+                        add_to_tree(avl_tree, temp, sheet);
+                    } else {
+                        *avl_tree.entry(key).or_insert(1) += 1;
+                    }
+                }
             }
         }
     }
