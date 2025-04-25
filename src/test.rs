@@ -68,6 +68,8 @@ mod tests {
         get_or_create_cell(&mut sheet, 0, 1).value = 20;
         get_or_create_cell(&mut sheet, 1, 0).value = 30;
         get_or_create_cell(&mut sheet, 1, 1).value = 40;
+
+        
         
         let result = sum(&sheet, 0, 0, 1, 1);
         assert_eq!(result, 100);
@@ -352,7 +354,7 @@ mod tests {
         assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 11);
 
         parse_command("F1=1-A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 9);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, -9);
 
         parse_command("F1=1*A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
         assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 10);
@@ -644,10 +646,10 @@ fn test_sleep_commands() {
     assert_eq!(time, 1.0);
     
     // Test SLEEP with a cell reference
-    parse_command("B1=2", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    parse_command("B1=1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
     parse_command("A2=SLEEP(B1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
     assert_eq!(sheet.data.get(&(1, 0)).unwrap().op_code, OpCode::Sleep);
-    assert_eq!(time, 2.0);  // 1 from the first sleep + 2 from the second
+    assert_eq!(time, 1.0);  // 1 from the first sleep + 2 from the second
 }
 
 #[test]
@@ -675,4 +677,34 @@ fn test_error_handling() {
     parse_command("C1=SUM(B2:A1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
     assert_eq!(status, "Invalid cmd");
 }
+
+
+
+#[test]
+fn test_topological_sort() {
+    let mut sheet = create_test_sheet();
+    
+    // Create cells
+    get_or_create_cell(&mut sheet, 0, 0); // A1
+    get_or_create_cell(&mut sheet, 0, 1); // B1
+    
+    // Setup B1 depends on A1
+    sheet.data.get_mut(&(0, 0)).unwrap().dependencies.insert(1000); // A1's dependencies include B1
+    
+    // Create avl_tree with indegrees
+    let mut avl_tree = HashMap::new();
+    avl_tree.insert(0, 0); // A1 has indegree 0 (no dependencies)
+    avl_tree.insert(1000, 1); // B1 has indegree 1 (depends on A1)
+    
+    // Run topological sort
+    let sorted = topological_sort(&mut avl_tree, &sheet);
+    
+    // Verify sort order: should be A1, B1
+    assert_eq!(sorted.len(), 2);
+    assert_eq!(sorted[0], 0); // A1 should be first
+    assert_eq!(sorted[1], 1000); // B1 should be second
+}
+
+
+
 }

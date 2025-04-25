@@ -1,7 +1,6 @@
 mod sheet_functions;
 mod parser;
-mod calculate_functions;
-mod ui_sheet_functions;
+mod calculate_functions; 
 
 #[cfg(feature = "gui")]
 mod ui;
