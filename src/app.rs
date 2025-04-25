@@ -305,7 +305,6 @@ impl App for SpreadsheetApp {
                     let row1 = ref_row1 - 1;
                     let col2 = col_name_to_col_num(ref_col2);
                     let row2 = ref_row2 - 1;
-                    println!("col1 : {} , row1: {} , col2 : {} , row2 : {} is_column:{is_column}  ", col1, row1, col2, row2);
                     sort_extension(col1,row1,col2,row2,sort_key,is_column,sort_order,self);
                     self.status = String::from("Sorted");
                     self.time = 0.0;

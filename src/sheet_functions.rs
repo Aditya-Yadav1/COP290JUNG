@@ -176,8 +176,8 @@ impl Sheet {
         }
 
         // Initialize the `data` and `tuup` HashMaps as empty
-        let data = HashMap::new();
-        let tuup = HashMap::new();
+        let data = HashMap::with_capacity(1000);
+        let tuup = HashMap::with_capacity(1000);
         
         Sheet {
             rows,
