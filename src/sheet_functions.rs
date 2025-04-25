@@ -307,11 +307,11 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
             }
             CellPlusCell | CellMinusCell | CellTimesCell | CellDivideCell => {
                 let (a_value, a_is_error, a_string) = {
-                    let a = get_or_create_cell(sheet, cell1.col as i32, cell1.row as i32);
+                    let a = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
                     (a.value, a.is_error, a.string.clone())
                 };
                 let (b_value, b_is_error, b_string) = {
-                    let b = get_or_create_cell(sheet, cell2.col as i32, cell2.row as i32);
+                    let b = get_or_create_cell(sheet, cell2.row as i32, cell2.col as i32);
                     (b.value, b.is_error, b.string.clone())
                 };
                 if a_is_error || b_is_error || a_string.is_some() || b_string.is_some() {
@@ -321,7 +321,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 }
             }
             CellPlusConstant | CellMinusConstant | CellTimesConstant | CellDivideConstant | ConstantDividesCell => {
-                let a = get_or_create_cell(sheet, cell1.col as i32, cell1.row as i32);
+                let a = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
                 if a.is_error || a.string.is_some() {
                     err = true;
                 } else {
@@ -329,7 +329,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                 }
             }
             Sleep => {
-                let a = get_or_create_cell(sheet, cell1.col as i32, cell1.row as i32);
+                let a = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
                 if a.is_error || a.string.is_some() {
                     err = true;
                 } else {
@@ -580,13 +580,14 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             cell.cell1 = cell1.clone();
             cell.cell2 = CellInfo { row: -1, col: -1 };
             cell.op_code = op_code;
-                
+            
             let ref_cell = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
             calc_error = ref_cell.is_error || ref_cell.string.is_some();
             if !calc_error {
                 ans = ref_cell.value;
+                *sleep_timer += ref_cell.value;
             }
-            ref_cell.dependencies.insert(key);    
+            ref_cell.dependencies.insert(key);
         }
         OpCode::CellPlusConstant| OpCode::CellMinusConstant| OpCode::CellTimesConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell => {
             if check_cycle(&avl_tree, &cell1, &temp) {
@@ -687,8 +688,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
     if op_code == OpCode::CellEqualsCell && !stringans.is_empty() {
         cell.string = Some(stringans.clone());
     }
-    
-    let sorted = topological_sort(&mut avl_tree, &sheet);
+    let sorted = topological_sort(&mut avl_tree, &sheet); 
     *status = String::from("ok");  
     for i in sorted.into_iter() {
         let row = i % 1000;

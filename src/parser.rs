@@ -1,18 +1,15 @@
 use std::thread; 
-use std::time::Duration;
-use eframe::glow::MAX_COMBINED_CLIP_AND_CULL_DISTANCES;
+use std::time::Duration; 
 use regex::Regex;
 use crate::sheet_functions;
 use crate::sheet_functions::col_name_to_col_num; 
-use crate::sheet_functions::CellInfo;
-// use crate::calculate_functions::compute_cell;   
+use crate::sheet_functions::CellInfo;  
 use crate::sheet_functions::is_valid_cell;
 use crate::sheet_functions::Sheet; 
 use std::time::Instant;
 use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
-use std::string::String;
-use crate::sheet_functions::Cell;
+use std::string::String; 
 use crate::sheet_functions::get_or_create_cell;
 
 pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
@@ -74,33 +71,13 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
     remove_space(&mut command);
 
    
-    if command == "w" {
-            *row_start = std::cmp::max(0, *row_start - 10);
-            *status = String::from("ok");
-        }
-    else if command == "s" {
-            *row_start = std::cmp::min(*row_start + 10, total_rows - 10);   
-            *status = String::from("ok");
-        }
-    else if command == "a" {
-            *col_start = std::cmp::max(0, *col_start - 10);
-            *status = String::from("ok");
-        }
-    else if command == "d" {
-            *col_start = std::cmp::min(*col_start + 10, total_cols - 10);
-            *status = String::from("ok");
-        }
-    else if command == "q" {
-            std::process::exit(0);
-        }
-    else if command == "enable_output" {
-            *print_enabled = true;
-            *status = String::from("ok");
-        }
-    else if command == "disable_output" {
-            *print_enabled = false;
-            *status = String::from("ok");
-        }
+    if command == "w"      {*row_start = std::cmp::max(0, *row_start - 10);*status = String::from("ok");}
+    else if command == "s" {*row_start = std::cmp::min(*row_start + 10, total_rows - 10);   *status = String::from("ok");}
+    else if command == "a" {*col_start = std::cmp::max(0, *col_start - 10);*status = String::from("ok");}
+    else if command == "d" {*col_start = std::cmp::min(*col_start + 10, total_cols - 10);*status = String::from("ok");}
+    else if command == "q" {std::process::exit(0);}
+    else if command == "enable_output"  {*print_enabled = true;*status = String::from("ok"); }
+    else if command == "disable_output" { *print_enabled = false; *status = String::from("ok");}
     // scroll_to
     else if let Some(caps) = re_scroll_to.captures(&command) {
         let col_str = caps.get(1).unwrap().as_str(); // Extract column letters
@@ -108,14 +85,9 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
 
         let c = col_name_to_col_num(col_str); // Convert column letters to number
         let r = row_num - 1; // Convert to 0-based index
-        if is_valid_cell(r, c, *total_rows, *total_cols) {
-            *col_start = c;
-            *row_start = r;
-            *status = String::from("ok");
-        } else {
-            *status = String::from("err");
-        }
-        return; // Exit early after handling scroll_to
+        if is_valid_cell(r, c, *total_rows, *total_cols) { *col_start = c;*row_start = r;*status = String::from("ok");} 
+        else {*status = String::from("err");}
+        return; 
     }
     // Cell = String
     else if let Some(caps) = re_string_cell.captures(&command) {
@@ -137,10 +109,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             sheet_functions::add_constraints(cell, cell1, cell2, String, sheet, status, &mut sleep_timer);
-             
-        } else {
-            *status = String::from("Invalid cmd");
-        }
+        } else {*status = String::from("Invalid cmd"); }
     }
 
     // Cell = int op int
@@ -151,27 +120,18 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap();
         let op = caps.get(4).unwrap().as_str().chars().next().unwrap();
         let val2: i32 = caps.get(5).unwrap().as_str().parse().unwrap();
-
-        
         let col = col_name_to_col_num(ref_col);
         let row = ref_row - 1;
-
-            // let (ans, err) = compute_cell(Opcode::  , val1, val2, status);
-            if is_valid_cell(row, col, *total_rows, *total_cols) && (op == '+' || op == '-' || op == '*' || op == '/') {
+        if is_valid_cell(row, col, *total_rows, *total_cols) && (op == '+' || op == '-' || op == '*' || op == '/') {
             let value;
             let mut calc_error = false; 
             if op=='+'{ value = val1 + val2;  }
             else if op =='-'{  value = val1 - val2;  }
             else if op =='*'{  value = val1 * val2;  }
-            else{ if val2 == 0 {
-                    calc_error=true;  value= -1;
-                }
-                else{ 
-                    value = val1 / val2;
-                }
-            }
-            let cell_entry = get_or_create_cell(sheet, row, col);
+            else{ if val2 == 0 {calc_error=true;  value= -1;}
+                else{  value = val1 / val2; }}
 
+            let cell_entry = get_or_create_cell(sheet, row, col);
             cell_entry.value = value;
             cell_entry.string = None;
             cell_entry.is_error = calc_error;
@@ -181,12 +141,8 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = NoConstraint;
             sheet_functions::add_constraints(cell, cell1, cell2,op_code, sheet, status, &mut sleep_timer);
-            
             *status = String::from("ok");
-        } else {
-            *status = String::from("Invalid cmd");
-        }  
-    
+        } else {*status = String::from("Invalid cmd");}  
     }
 
     // Cell = cell op cell
@@ -199,25 +155,20 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let op = caps.get(5).unwrap().as_str().chars().next().unwrap();
         let val_col2 = caps.get(6).unwrap().as_str();
         let val_row2: i32 = caps.get(7).unwrap().as_str().parse().unwrap();
-        
+
         let col = col_name_to_col_num(ref_col);
         let row = ref_row - 1;
         let col1 = col_name_to_col_num(val_col1);
         let col2 = col_name_to_col_num(val_col2);
         
-        if is_valid_cell(row, col, *total_rows, *total_cols) && 
-           is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) && 
-           is_valid_cell(val_row2 - 1, col2, *total_rows, *total_cols) && 
-           (op == '+' || op == '-' || op == '*' || op == '/') {
+        if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) && 
+           is_valid_cell(val_row2 - 1, col2, *total_rows, *total_cols) && (op == '+' || op == '-' || op == '*' || op == '/') {
             let op_code = get_op_code2(op);
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
             let cell2 = CellInfo { row: val_row2 as i16 - 1, col: col2 as i16 };
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
-             
-        } else {
-            *status = String::from("Invalid cmd");
-        }
+        } else {*status = String::from("Invalid cmd");}
     }
     // Cell = int op cell
     else if let Some(caps) = re_cell_eq_int_op_cell.captures(&command) {
@@ -233,9 +184,8 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let row  = ref_row as i32 - 1;
         let col1   = col_name_to_col_num(val_col1)  ;
         
-        if is_valid_cell(row as i32, col as i32, *total_rows, *total_cols) && 
-           is_valid_cell(val_row1 - 1, col1 as i32, *total_rows, *total_cols) && 
-           (op == '+' || op == '-' || op == '*' || op == '/') { 
+        if is_valid_cell(row as i32, col as i32, *total_rows, *total_cols) &&  (op == '+' || op == '-' || op == '*' || op == '/')&&
+            is_valid_cell(val_row1 - 1, col1 as i32, *total_rows, *total_cols)  { 
             // Splitting the constant into two 16 bit variables
             let const1 = val1 & 0xFFFF;
             let const2 = (val1 >> 16) & 0xFFFF;
@@ -243,12 +193,8 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
             let cell2 = CellInfo { row: const2 as i16, col: const1 as i16 };
-            
-            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
-            
-        } else {
-            *status = String::from("Invalid cmd");
-        }
+            sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);          
+        } else {*status = String::from("Invalid cmd");}
     }
     // Cell = cell op int
     else if let Some(caps) = re_cell_eq_cell_op_int.captures(&command) {
@@ -264,22 +210,17 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let row = ref_row - 1;
         let col1 = col_name_to_col_num(val_col1);
         
-        if is_valid_cell(row, col, *total_rows, *total_cols) && 
-           is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) && 
-           (op == '+' || op == '-' || op == '*' || op == '/') { 
+        if is_valid_cell(row, col, *total_rows, *total_cols) && (op == '+' || op == '-' || op == '*' || op == '/') && 
+           is_valid_cell(val_row1 - 1, col1, *total_rows, *total_cols) { 
             // Splitting the constant into two 16 bit variables
             let const1 = val1 & 0xFFFF;
             let const2 = (val1 >> 16) & 0xFFFF; 
             let op_code = get_op_code(op, false);
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: val_row1 as i16 - 1, col: col1 as i16 };
-            let cell2 = CellInfo { row: const2 as i16, col: const1 as i16 };
-            
+            let cell2 = CellInfo { row: const2 as i16, col: const1 as i16 };  
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
-          
-        } else {
-            *status = String::from("Invalid cmd");
-        }
+        } else {*status = String::from("Invalid cmd");}
     }
 // Cell = func(cell:cell)
 else if let Some(caps) = re_cell_eq_func.captures(&command) {
@@ -300,37 +241,21 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
     let row1 = val_row1 - 1;
     let row2 = val_row2 - 1;
 
-    if is_valid_cell(row, col, *total_rows, *total_cols) &&
-       is_valid_cell(row1, col1, *total_rows, *total_cols) &&
-       is_valid_cell(row2, col2, *total_rows, *total_cols) &&
-       val_row1 <= val_row2 && col1 <= col2 {
- 
-          
-            let op_code = func_to_op_code(func_name);
-            if op_code == NoConstraint {
-                *status = String::from("Invalid cmd");
-                return;
-            }
+    let op_code = func_to_op_code(func_name);
+    if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) &&
+    is_valid_cell(row2, col2, *total_rows, *total_cols) && val_row1 <= val_row2 && col1 <= col2 && op_code != NoConstraint {
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
             let cell2 = CellInfo { row: row2 as i16, col: col2 as i16 };
-
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
-        // }
-     }else {
-        *status = String::from("Invalid cmd");
-    }
+     }else { *status = String::from("Invalid cmd");}
 }
-
     // Cell = int
     else if let Some(caps) = re_cell_eq_int.captures(&command) {
         *time = 0.0;
         let ref_col = caps.get(1).unwrap().as_str();
         let ref_row: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
-        let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap_or_else(|_| {
-            *status = String::from("Invalid cmd");
-            return 0;
-        });
+        let val1: i32 = caps.get(3).unwrap().as_str().parse().unwrap_or_else(|_| {*status = String::from("Invalid cmd");return 0;});
         
         let col = col_name_to_col_num(ref_col);
         let row = ref_row - 1; 
@@ -339,16 +264,13 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             cell_entry.string = None;
             cell_entry.value = val1;
             cell_entry.is_error = false;
-            *status = String::from("ok");
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: -1, col: -1 };
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = NoConstraint;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
- 
-        } else {
-            *status = String::from("Invalid cmd");
-        }
+            *status = String::from("ok");
+        } else {*status = String::from("Invalid cmd");}
     }
     // Cell = cell
     else if let Some(caps) = re_cell_eq_cell.captures(&command) {
@@ -364,16 +286,12 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         let row1 = val_row1 - 1;
         
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
-            
                 let cell = CellInfo { row: row as i16, col: col as i16 };
                 let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
                 let cell2 = CellInfo { row: -1, col: -1 };
                 let op_code = CellEqualsCell;
-    
                 sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
-        } else {
-            *status = String::from("Invalid cmd");
-        }
+        } else {*status = String::from("Invalid cmd");}
     }
     // Cell = SLEEP(int)
     else if let Some(caps) = re_sleep_int.captures(&command) {
@@ -398,11 +316,8 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             if val1 >= 0 {
                 *time = val1 as f32;
                 sleep_timer += val1;
-                // thread::sleep(Duration::from_secs(val1 as u64));
             }
-        } else {
-            *status = String::from("err");
-        }
+        } else {*status = String::from("err");}
     }
     // Cell = SLEEP(cell)
     else if let Some(caps) = re_sleep_cell.captures(&command) {
@@ -417,15 +332,12 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         let row1 = val_row1 - 1;
 
         if is_valid_cell(row, col, *total_rows, *total_cols) && is_valid_cell(row1, col1, *total_rows, *total_cols) {
-             
             let cell = CellInfo { row: row as i16, col: col as i16 };
             let cell1 = CellInfo { row: row1 as i16, col: col1 as i16 };
             let cell2 = CellInfo { row: -1, col: -1 };
             let op_code = Sleep;
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
-        } else {
-            *status = String::from("err");
-        }
+        } else {*status = String::from("err");}
     } 
     else if let Some(caps) = re_sort.captures(&command) {
         let ref_col1 = caps.get(1).unwrap().as_str();
@@ -493,14 +405,10 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
         }
         sheet_functions::sort_sheet(sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
     }
-    else {
-        *status = String::from("Invalid cmd");
-    }
+    else {*status = String::from("Invalid cmd");}
 
     let elapsed = start_time.elapsed();
-    if elapsed.as_secs_f32() > sleep_timer as f32 {
-        *time = elapsed.as_secs_f32();
-    }
+    if elapsed.as_secs_f32() > sleep_timer as f32 {*time = elapsed.as_secs_f32();}
     else{
         *time = sleep_timer as f32;
         thread::sleep(Duration::from_secs(sleep_timer as u64 - elapsed.as_secs()));
