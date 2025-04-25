@@ -87,6 +87,7 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
         let r = row_num - 1; // Convert to 0-based index
         if is_valid_cell(r, c, *total_rows, *total_cols) { *col_start = c;*row_start = r;*status = String::from("ok");} 
         else {*status = String::from("err");}
+        *time = 0.0;
         return; 
     }
     // Cell = String
