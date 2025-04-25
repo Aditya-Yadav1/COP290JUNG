@@ -649,6 +649,10 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             cell.cell1 = cell1.clone();
             cell.cell2 = CellInfo { row: -1, col: -1 };
             cell.op_code = op_code;
+            let temp = sheet.rows;
+            let temp2 = sheet.cols;
+            sheet.rows = temp;
+            sheet.cols = temp2;
             
             let ref_cell = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
             calc_error = ref_cell.is_error || ref_cell.string.is_some();
