@@ -128,6 +128,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::Save;
                 }
                 if app.show_menu == Menu::Save {
+                    Menu::Mode == Normal;
                     egui::Window::new("Save").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
                         ui.label("Enter filename:");
                         let resp = ui.text_edit_singleline(&mut app.save_filename);
@@ -166,6 +167,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }
                
                 if app.show_menu == Menu::Open {
+                    Menu :: Mode == Normal;
                     egui::Window::new("Open").resizable(false).collapsible(false).movable(false).show(ctx, |ui| {
                         ui.label("Enter filename:");    
                         let resp = ui.text_edit_singleline(&mut app.open_filename);
@@ -200,6 +202,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::FindAndReplace;
                 }
                 if app.show_menu == Menu::FindAndReplace {
+                    Mennu::Mode == Normal;
                     egui::Window::new("Find and Replace").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Find:");
                         ui.text_edit_singleline(&mut app.find_text);
@@ -227,6 +230,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::PlotGraph;
                 }
                 if app.show_menu == Menu::PlotGraph {
+                    Menu::Mode == Normal;
                     egui::Window::new("Plot Graph").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Enter first column (e.g., A):");
                         ui.text_edit_singleline(&mut app.plot_column1);
@@ -308,6 +312,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }
 
                 if ui.button("Clear").clicked() { 
+                    Menu::Mode == Normal;
                     app.sheets[app.current_sheet_index].sheet.data.clear();
                     app.sheets[app.current_sheet_index].sheet.buul.clear();
                     app.sheets[app.current_sheet_index].sheet.tuup.clear();
@@ -317,23 +322,28 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }
 
                 if ui.button("Cut").clicked() {
+                    Menu::Mode == Normal;
                     cut(app);
                 }
 
                 if ui.button("Copy").clicked() {
+                    Menu::Mode == Normal;
                     copy(app);
                 }
 
                 if ui.button("Paste").clicked() {
+                    Menu::Mode == Normal;
                     paste(app);
                 }
 
                 if ui.button("Undo").clicked() {
+                    Menu::Mode == Normal;
                     app.undo();
                     ctx.request_repaint();
                 }
 
                 if ui.button("Redo").clicked() {
+                    Menu::Mode == Normal;
                     app.redo();
                     ctx.request_repaint();
                 }
@@ -361,6 +371,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu = Menu::SelectCell;
                 }
                 if app.show_menu == Menu::SelectCell {
+                    Menu::Mode == Normal;
                     egui::Window::new("select_cell").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Enter cell to scroll to:");
                         let select_cell = ui.text_edit_singleline(&mut app.input_select_cell);
@@ -398,6 +409,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                 }        
 
                 if app.show_menu == Menu::Theme {
+                    Menu::Mode == Normal;
                     egui::Window::new("Theme").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Select theme:");
                         for theme in &THEMES {
@@ -412,6 +424,7 @@ pub fn show_menu(mut app: &mut SpreadsheetApp, ctx: &egui::Context, ui: &mut egu
                     app.show_menu=Menu :: Sort;
                 }
                 if app.show_menu == Menu :: Sort {
+                    Menu::Mode == Normal;
                     egui::Window::new("Sort").resizable(false).collapsible(false).show(ctx, |ui| {
                         ui.label("Select column to sort:");
                         ui.horizontal(|ui| {

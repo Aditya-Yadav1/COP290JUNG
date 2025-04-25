@@ -49,7 +49,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(feature = "gui")]
     {
-        if args.len() == 2 && args[1] == "gui" {
             let options = eframe::NativeOptions::default();
             return eframe::run_native(
                 "Rusty Spreadsheet GUI",
@@ -65,7 +64,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Box::new(SpreadsheetApp::new(sheets))
                 }),
             ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
-        }
     }
 
     #[cfg(feature = "no_gui")]

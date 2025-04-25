@@ -18,97 +18,98 @@ pub fn convert_to_csv(sheet: &Sheet, filename: &str) {
     let save_file_name = format!("{}.csv", filename);
     let mut file = File::create(save_file_name).unwrap();
 
-    // for row in 0..sheet.rows {
-    //     let row_values: Vec<String> = (0..sheet.cols)
-    //         .map(|col| {
-    //             if let Some(cell) = sheet.data.get(&(row, col)) {
-    //                 if cell.is_error {
-    //                     "Err".to_string()
-    //                 } else if let Some(ref s) = cell.string {
-    //                     if s.contains(',') {
-    //                         format!("\"{}\"", s)
-    //                     } else {
-    //                         s.clone()
-    //                     }
-    //                 } else {
-    //                     cell.value.to_string()
-    //                 }
-    //             } else {
-    //                 // Default value for cells not in the map
-    //                 "0".to_string()
-    //             }
-    //         })
-    //         .collect();
+    for row in 0..sheet.rows {
+        let row_values: Vec<String> = (0..sheet.cols)
+            .map(|col| {
+                if let Some(cell) = sheet.data.get(&(row as i16, col as i16)) {
+                    if cell.is_error {
+                        "Err".to_string()
+                    } else if let Some(ref s) = cell.string {
+                        if s.contains(',') {
+                            format!("\"{}\"", s)
+                        } else {
+                            s.clone()
+                        }
+                    } else {
+                        cell.value.to_string()
+                    }
+                } else {
+                    "0".to_string()
+                }
+            })
+            .collect();
 
-    //     let line = row_values.join(",") + "\n";
-    //     file.write_all(line.as_bytes()).unwrap();
-    // }
+        let line = row_values.join(",") + "\n";
+        file.write_all(line.as_bytes()).unwrap();
+    }
 }
 
 
 pub fn open_csv(filename: &str, app: &mut SpreadsheetApp) -> String {
-    // app.new_sheet_name = filename.to_string();
-    // app.create_new_sheet(10, 10);
-    // let sheet = &mut app.sheets[app.current_sheet_index].sheet;
+    app.new_sheet_name = filename.to_string();
+    app.create_new_sheet(10, 10);
+    let sheet = &mut app.sheets[app.current_sheet_index].sheet;
 
-    // let file = match File::open(filename) {
-    //     Ok(f) => f,
-    //     Err(e) => return format!("Failed to open file: {}", e),
-    // };
+    let file = match File::open(filename) {
+        Ok(f) => f,
+        Err(e) => return format!("Failed to open file: {}", e),
+    };
 
-    // let reader = BufReader::new(file);
-    // sheet.data.clear();
+    let reader = BufReader::new(file);
+    sheet.data.clear();
     let mut has_error = false;
 
-    // for (row_idx, line) in reader.lines().enumerate() {
-    //     let line = match line {
-    //         Ok(l) => l,
-    //         Err(_) => {
-    //             has_error = true;
-    //             break;
-    //         }
-    //     };
+    for (row_idx, line) in reader.lines().enumerate() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => {
+                has_error = true;
+                break;
+            }
+        };
 
-    //     for (col_idx, value) in line.split(',').enumerate() {
-    //         let trimmed = value.trim();
-    //         let cell = if trimmed.starts_with('"') && trimmed.ends_with('"') {
-    //             Cell {
-    //                 value: 0,
-    //                 string: Some(trimmed[1..trimmed.len() - 1].to_string()),
-    //                 is_error: false,
-    //                 op_code: OpCode::String,
-    //                 cell1: CellInfo { row: -1, col: -1 },
-    //                 cell2: CellInfo { row: -1, col: -1 },
-    //                 dependencies: HashSet::new(),
-    //             }
-    //         } else {
-    //             match trimmed.parse::<i32>() {
-    //                 Ok(num) => Cell {
-    //                     value: num,
-    //                     string: None,
-    //                     is_error: false,
-    //                     op_code: OpCode::NoConstraint,
-    //                     cell1: CellInfo { row: -1, col: -1 },
-    //                     cell2: CellInfo { row: -1, col: -1 },
-    //                     dependencies: HashSet::new(),
-    //                 },
-    //                 Err(_) => Cell {
-    //                     value: 0,
-    //                     string: Some(trimmed.to_string()),
-    //                     is_error: false,
-    //                     op_code: OpCode::String,
-    //                     cell1: CellInfo { row: -1, col: -1 },
-    //                     cell2: CellInfo { row: -1, col: -1 },
-    //                     dependencies: HashSet::new(),
-    //                 },
-    //             }
-    //         };
-    //         sheet.data.insert((row_idx as i32, col_idx as i32), cell);
-    //     }
-    // }
+        for (col_idx, value) in line.split(',').enumerate() {
+            let trimmed = value.trim();
+            let cell = if trimmed.starts_with('"') && trimmed.ends_with('"') {
+                Cell {
+                    value: 0,
+                    string: Some(trimmed[1..trimmed.len() - 1].to_string()),
+                    is_error: false,
+                    op_code: OpCode::String,
+                    cell1: CellInfo { row: -1, col: -1 },
+                    cell2: CellInfo { row: -1, col: -1 },
+                    dependencies: HashSet::new(),
+                }
+            } else {
+                match trimmed.parse::<i32>() {
+                    Ok(num) => Cell {
+                        value: num,
+                        string: None,
+                        is_error: false,
+                        op_code: OpCode::NoConstraint,
+                        cell1: CellInfo { row: -1, col: -1 },
+                        cell2: CellInfo { row: -1, col: -1 },
+                        dependencies: HashSet::new(),
+                    },
+                    Err(_) => Cell {
+                        value: 0,
+                        string: Some(trimmed.to_string()),
+                        is_error: false,
+                        op_code: OpCode::String,
+                        cell1: CellInfo { row: -1, col: -1 },
+                        cell2: CellInfo { row: -1, col: -1 },
+                        dependencies: HashSet::new(),
+                    },
+                }
+            };
+            if cell.value !=0{
+                sheet.data.insert((row_idx as i16, col_idx as i16 ), cell);
+            }
+        }
+    }
 
-    // sheet.rows = sheet.data.keys().map(|(r, _)| *r).max().unwrap_or(0) + 1;
-    // sheet.cols = sheet.data.keys().map(|(_, c)| *c).max().unwrap_or(0) + 1;
+    sheet.rows = (sheet.data.keys().map(|(r, _)| *r).max().unwrap_or(0) + 1) as i32;
+    sheet.cols = (sheet.data.keys().map(|(_, c)| *c).max().unwrap_or(0) + 1) as i32;
 
     if has_error {
         "error loading csv".to_string()
