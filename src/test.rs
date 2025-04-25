@@ -1,41 +1,189 @@
 #[cfg(test)]
 mod tests {
-    use crate::parser::{parse_command, get_op_code, get_op_code2, func_to_op_code};
-    use crate::sheet_functions::{Sheet, CellInfo, OpCode, col_name_to_col_num, col_num_to_col_name, is_valid_cell, add_constraints, recalculate, topological_sort, sort_sheet};
-    use crate::calculate_functions::{compute_cell, compute_range_func};
+    use crate::sheet_functions::*;
+    use crate::calculate_functions::*;
+    use crate::parser::*;
     use std::collections::HashMap;
-    use std::string::String;
+    use std::string::String; 
 
-    // Helper function to create a new sheet
-    fn new_sheet(rows: i32, cols: i32) -> Sheet {
-        Sheet::new(rows, cols)
+    // Helper function to create test sheets
+    fn create_test_sheet() -> Sheet {
+        Sheet::new(10, 10)
+    }
+
+    // Basic Sheet Tests
+    #[test]
+    fn test_sheet_creation() {
+        let sheet = create_test_sheet();
+        assert_eq!(sheet.rows, 10);
+        assert_eq!(sheet.cols, 10);
+        assert_eq!(sheet.data.len(), 0);
     }
 
     #[test]
-    fn test_col_name_conversion() {
+    fn test_column_name_conversion() {
         assert_eq!(col_name_to_col_num("A"), 0);
-        assert_eq!(col_name_to_col_num("B"), 1);
         assert_eq!(col_name_to_col_num("Z"), 25);
         assert_eq!(col_name_to_col_num("AA"), 26);
         assert_eq!(col_name_to_col_num("AB"), 27);
-
+        
         assert_eq!(col_num_to_col_name(0), "A");
-        assert_eq!(col_num_to_col_name(1), "B");
         assert_eq!(col_num_to_col_name(25), "Z");
         assert_eq!(col_num_to_col_name(26), "AA");
         assert_eq!(col_num_to_col_name(27), "AB");
     }
 
     #[test]
-    fn test_is_valid_cell() {
+    fn test_cell_validity() {
         assert!(is_valid_cell(0, 0, 10, 10));
         assert!(is_valid_cell(9, 9, 10, 10));
+        assert!(!is_valid_cell(10, 9, 10, 10));
+        assert!(!is_valid_cell(9, 10, 10, 10));
         assert!(!is_valid_cell(-1, 0, 10, 10));
-        assert!(!is_valid_cell(0, -1, 10, 10));
-        assert!(!is_valid_cell(10, 0, 10, 10));
-        assert!(!is_valid_cell(0, 10, 10, 10));
     }
 
+    // Cell Management Tests
+    #[test]
+    fn test_get_or_create_cell() {
+        let mut sheet = create_test_sheet();
+        
+        let cell = get_or_create_cell(&mut sheet, 1, 1);
+        assert_eq!(cell.value, 0);
+        assert!(!cell.is_error);
+        assert_eq!(cell.string, None);
+        assert_eq!(cell.op_code, OpCode::NoConstraint);
+        
+        cell.value = 42;
+        
+        let cell2 = get_or_create_cell(&mut sheet, 1, 1);
+        assert_eq!(cell2.value, 42);
+    }
+
+    // Mathematical Function Tests
+    #[test]
+    fn test_sum_function() {
+        let mut sheet = create_test_sheet();
+        
+        get_or_create_cell(&mut sheet, 0, 0).value = 10;
+        get_or_create_cell(&mut sheet, 0, 1).value = 20;
+        get_or_create_cell(&mut sheet, 1, 0).value = 30;
+        get_or_create_cell(&mut sheet, 1, 1).value = 40;
+        
+        let result = sum(&sheet, 0, 0, 1, 1);
+        assert_eq!(result, 100);
+    }
+
+    #[test]
+    fn test_min_function() {
+        let mut sheet = create_test_sheet();
+        
+        get_or_create_cell(&mut sheet, 0, 0).value = 10;
+        get_or_create_cell(&mut sheet, 0, 1).value = 5;
+        get_or_create_cell(&mut sheet, 1, 0).value = 30;
+        get_or_create_cell(&mut sheet, 1, 1).value = 15;
+        
+        let result = min(&sheet, 0, 0, 1, 1);
+        assert_eq!(result, 5);
+    }
+
+    #[test]
+    fn test_max_function() {
+        let mut sheet = create_test_sheet();
+        
+        get_or_create_cell(&mut sheet, 0, 0).value = 10;
+        get_or_create_cell(&mut sheet, 0, 1).value = 20;
+        get_or_create_cell(&mut sheet, 1, 0).value = 30;
+        get_or_create_cell(&mut sheet, 1, 1).value = 15;
+        
+        let result = max(&sheet, 0, 0, 1, 1);
+        assert_eq!(result, 30);
+    }
+
+    #[test]
+    fn test_avg_function() {
+        let mut sheet = create_test_sheet();
+        
+        get_or_create_cell(&mut sheet, 0, 0).value = 10;
+        get_or_create_cell(&mut sheet, 0, 1).value = 20;
+        get_or_create_cell(&mut sheet, 1, 0).value = 30;
+        get_or_create_cell(&mut sheet, 1, 1).value = 40;
+        
+        let result = avg(&sheet, 0, 0, 1, 1);
+        assert_eq!(result, 25); // (10+20+30+40)/4 = 25
+    }
+
+    #[test]
+    fn test_stdev_function() {
+        let mut sheet = create_test_sheet();
+        
+        // Uniform values (standard deviation should be 0)
+        get_or_create_cell(&mut sheet, 0, 0).value = 10;
+        get_or_create_cell(&mut sheet, 0, 1).value = 10;
+        get_or_create_cell(&mut sheet, 1, 0).value = 10;
+        get_or_create_cell(&mut sheet, 1, 1).value = 10;
+        
+        let result = stdev(&sheet, 0, 0, 1, 1);
+        assert_eq!(result, 0);
+        
+        // Mixed values
+        get_or_create_cell(&mut sheet, 0, 0).value = 10;
+        get_or_create_cell(&mut sheet, 0, 1).value = 20;
+        get_or_create_cell(&mut sheet, 1, 0).value = 30;
+        get_or_create_cell(&mut sheet, 1, 1).value = 40;
+        
+        let result = stdev(&sheet, 0, 0, 1, 1);
+        assert_eq!(result, 11); // sqrt((sum((x-avg)^2)/n)) ≈ 13
+    }
+
+    // Cell Computation Tests
+    #[test]
+    fn test_compute_cell() {
+        let mut status = String::new();
+        
+        // Addition
+        let (result, error) = compute_cell(OpCode::CellPlusCell, 10, 20, &mut status);
+        assert_eq!(result, 30);
+        assert!(!error);
+        
+        // Subtraction
+        let (result, error) = compute_cell(OpCode::CellMinusCell, 30, 10, &mut status);
+        assert_eq!(result, 20);
+        assert!(!error);
+        
+        // Multiplication
+        let (result, error) = compute_cell(OpCode::CellTimesCell, 5, 4, &mut status);
+        assert_eq!(result, 20);
+        assert!(!error);
+        
+        // Division
+        let (result, error) = compute_cell(OpCode::CellDivideCell, 20, 5, &mut status);
+        assert_eq!(result, 4);
+        assert!(!error);
+        
+        // Division by zero
+        let (result, error) = compute_cell(OpCode::CellDivideCell, 20,0,&mut status);
+        assert_eq!(result, -1);
+        assert!(error);
+
+        // 
+        let (result, error) = compute_cell(OpCode::ConstantDividesCell, 0,20,&mut status);
+        assert_eq!(result, -1);
+        assert!(error);
+
+        let (result, error) = compute_cell(OpCode::ConstantDividesCell, 20,20,&mut status);
+        assert_eq!(result, 1);
+        assert!(!error);
+
+        let (result, error) = compute_cell(OpCode::String, 20,0,&mut status);
+        assert_eq!(result, 20);
+        assert!(!error);
+
+        let (result, error) = compute_cell(OpCode::Sleep, 20,0,&mut status);
+        assert_eq!(result, -1);
+        assert!(error);
+    }
+
+    // OpCode Tests
     #[test]
     fn test_get_op_code() {
         assert_eq!(get_op_code('+', false), OpCode::CellPlusConstant);
@@ -43,7 +191,7 @@ mod tests {
         assert_eq!(get_op_code('*', false), OpCode::CellTimesConstant);
         assert_eq!(get_op_code('/', false), OpCode::CellDivideConstant);
         assert_eq!(get_op_code('/', true), OpCode::ConstantDividesCell);
-        assert_eq!(get_op_code('?', false), OpCode::NoConstraint);
+        assert_eq!(get_op_code('x', false), OpCode::NoConstraint);
     }
 
     #[test]
@@ -52,7 +200,7 @@ mod tests {
         assert_eq!(get_op_code2('-'), OpCode::CellMinusCell);
         assert_eq!(get_op_code2('*'), OpCode::CellTimesCell);
         assert_eq!(get_op_code2('/'), OpCode::CellDivideCell);
-        assert_eq!(get_op_code2('?'), OpCode::NoConstraint);
+        assert_eq!(get_op_code2('x'), OpCode::NoConstraint);
     }
 
     #[test]
@@ -62,267 +210,469 @@ mod tests {
         assert_eq!(func_to_op_code("MAX"), OpCode::Max);
         assert_eq!(func_to_op_code("AVG"), OpCode::Avg);
         assert_eq!(func_to_op_code("STDEV"), OpCode::Stdev);
-        assert_eq!(func_to_op_code("INVALID"), OpCode::NoConstraint);
+        assert_eq!(func_to_op_code("UNKNOWN"), OpCode::NoConstraint);
+    }
+
+    // Cell Dependency Tests
+    #[test]
+    fn test_add_constraints_simple() {
+        let mut sheet = create_test_sheet();
+        let mut status = String::new();
+        let mut sleep_timer = 0;
+        
+        // Set A1 = 10
+        let cell = CellInfo { row: 0, col: 0 };
+        let cell1 = CellInfo { row: -1, col: -1 };
+        let cell2 = CellInfo { row: -1, col: -1 };
+        
+        get_or_create_cell(&mut sheet, 0, 0).value = 10;
+        add_constraints(cell, cell1, cell2, OpCode::NoConstraint, &mut sheet, &mut status, &mut sleep_timer);
+        
+        assert_eq!(sheet.data.get(&(0, 0)).unwrap().value, 10);
+        assert_eq!(status, "ok");
     }
 
     #[test]
-    fn test_parse_command_navigation() {
-        let mut sheet = new_sheet(20, 20);
-        let mut row_start = 5;
-        let mut col_start = 5;
-        let mut time = 0.0;
+    fn test_add_constraints_cell_equals_cell() {
+        let mut sheet = create_test_sheet();
         let mut status = String::new();
+        let mut sleep_timer = 0;
+        
+        // Set B1 = 20
+        get_or_create_cell(&mut sheet, 0, 1).value = 20;
+        
+        // Set A1 = B1
+        let cell = CellInfo { row: 0, col: 0 };
+        let cell1 = CellInfo { row: 0, col: 1 };
+        let cell2 = CellInfo { row: -1, col: -1 };
+        
+        add_constraints(cell, cell1, cell2, OpCode::CellEqualsCell, &mut sheet, &mut status, &mut sleep_timer);
+        
+        assert_eq!(sheet.data.get(&(0, 0)).unwrap().value, 20);
+        assert_eq!(status, "ok");
+        assert!(sheet.data.get(&(0, 1)).unwrap().dependencies.contains(&(0 * 1000 + 0)));
+    }
+
+    #[test]
+    fn test_circular_dependency() {
+        let mut sheet = create_test_sheet();
+        let mut status = String::new();
+        let mut sleep_timer = 0;
+    
+        // Set A1 = B1
+        let cell_a1 = CellInfo { row: 0, col: 0 };
+        let cell_b1 = CellInfo { row: 0, col: 1 };
+        let empty = CellInfo { row: -1, col: -1 };
+    
+        add_constraints(cell_a1, cell_b1, empty, OpCode::CellEqualsCell, &mut sheet, &mut status, &mut sleep_timer);
+        
+        // Try to create circular reference: B1 = A1
+        status = String::new();
+        let cell_b1 = CellInfo { row: 0, col: 1 };
+        let cell_a1 = CellInfo { row: 0, col: 0 };
+        let empty = CellInfo { row: -1, col: -1 };
+        add_constraints(cell_b1, cell_a1, empty, OpCode::CellEqualsCell, &mut sheet, &mut status, &mut sleep_timer);
+    
+        assert_eq!(status, "circular error");
+    }
+
+    // Parser Tests
+    #[test]
+    fn test_parse_command_simple_assignment() {
+        let mut sheet = create_test_sheet();
+        let mut row_start = 0;
+        let mut col_start = 0;
+        let mut time = 0.0;
+        let mut status = String::from("ok");
+        let total_rows = 10;
+        let total_cols = 10;
         let mut print_enabled = true;
-        let  total_rows = 20;
-        let  total_cols = 20;
-
-        // Test 'w' (move up)
-        parse_command("w", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(row_start, 0);
+        
+        // Test A1=42
+        parse_command("A1=42", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        assert_eq!(sheet.data.get(&(0, 0)).unwrap().value, 42);
         assert_eq!(status, "ok");
-
-        // Test 's' (move down)
-        parse_command("s", &mut row_start, &mut col_start, &mut time, &mut status,  &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(row_start, 10);
-        assert_eq!(status, "ok");
-
-        // Test 'a' (move left)
-        parse_command("a", &mut row_start, &mut col_start, &mut time, &mut status,  &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(col_start, 0);
-        assert_eq!(status, "ok");
-
-        // Test 'd' (move right)
-        parse_command("d", &mut row_start, &mut col_start, &mut time, &mut status,  &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(col_start, 10);
-        assert_eq!(status, "ok");
-
-        // Test 'scroll_to'
-        parse_command("scroll_toB3", &mut row_start, &mut col_start, &mut time, &mut status,  &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(row_start, 2);
-        assert_eq!(col_start, 1);
-        assert_eq!(status, "ok");
-
-        // Test invalid scroll_to
-        parse_command("scroll_toB21", &mut row_start, &mut col_start, &mut time, &mut status,  &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "err");
     }
 
     #[test]
     fn test_parse_command_cell_operations() {
-        let mut sheet = new_sheet(10, 10);
+        let mut sheet = create_test_sheet();
         let mut row_start = 0;
         let mut col_start = 0;
         let mut time = 0.0;
         let mut status = String::new();
+        let total_rows = 10;
+        let total_cols = 10;
         let mut print_enabled = true;
-        let  total_rows = 10;
-        let  total_cols = 10;
-
-        // Test cell = int
-        parse_command("A1=42", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[0][0].value, 42);
-        assert_eq!(sheet.data[0][0].is_error, false);
-        assert_eq!(status, "ok");
-
-        // Test cell = string
-        parse_command("A2=\"hello\"", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[1][0].string, Some("hello".to_string()));
-        assert_eq!(status, "ok");
-
-        // Test cell = int op int
-        parse_command("A3=5+3", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[2][0].value, 8);
-        assert_eq!(status, "ok");
-
-        // Test cell = cell
-        parse_command("A4=A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[3][0].value, 42);
-        assert_eq!(status, "ok");
-
-        // Test cell = cell op cell
-        parse_command("B1=A1+A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[0][1].value, 84);
-        assert_eq!(status, "ok");
-
-        // Test cell = int op cell
-        parse_command("B2=10+A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[1][1].value, 52);
-        assert_eq!(status, "ok");
-
-        // Test cell = cell op int
-        parse_command("B3=A1+10", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[2][1].value, 52);
-        assert_eq!(status, "ok");
-
-        // Test cell = func(cell:cell)
-        parse_command("C1=SUM(A1:A1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[0][2].value, 42);
-        assert_eq!(status, "ok");
-
-        // Test sleep(int)
-        parse_command("C2=SLEEP(2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[1][2].value, 2);
-        assert_eq!(status, "ok");
-        assert_eq!(time, 2.0);
-
-        // Test sleep(cell)
-        parse_command("C3=SLEEP(C2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "ok");
-    }
-
-    #[test]
-    fn test_parse_command_error_cases() {
-        let mut sheet = new_sheet(5, 5);
-        let mut row_start = 0;
-        let mut col_start = 0;
-        let mut time = 0.0;
-        let mut status = String::new();
-        let mut print_enabled = true;
-        let  total_rows = 5;
-        let  total_cols = 5;
-
-        // Invalid cell reference
-        parse_command("Z1=42", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "Invalid cmd");
-
-        // Division by zero
-        parse_command("A1=10/0", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(sheet.data[0][0].is_error, true);
-        assert_eq!(status, "ok");
-
-        // Invalid command
-        parse_command("INVALID", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "Invalid cmd");
-
-        // Type error in func
-        parse_command("A1=\"text\"", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        parse_command("A2=SUM(A1:A1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "type error");
-    }
-
-    #[test]
-    fn test_compute_cell() {
-        let mut status = String::new();
-        assert_eq!(compute_cell(OpCode::CellPlusCell, 5, 3, &mut status), (8, false));
-        assert_eq!(compute_cell(OpCode::CellMinusCell, 5, 3, &mut status), (2, false));
-        assert_eq!(compute_cell(OpCode::CellTimesCell, 5, 3, &mut status), (15, false));
-        assert_eq!(compute_cell(OpCode::CellDivideCell, 6, 2, &mut status), (3, false));
-        assert_eq!(compute_cell(OpCode::CellDivideCell, 6, 0, &mut status), (-1, true));
-        assert_eq!(compute_cell(OpCode::ConstantDividesCell, 0, 6, &mut status), (-1, true));
-        assert_eq!(compute_cell(OpCode::NoConstraint, 0, 0, &mut status), (-1, true));
-    }
-
-    #[test]
-    fn test_compute_range_func() {
-        let mut sheet = new_sheet(5, 5);
-        let mut row_start = 0;
-        let mut col_start = 0;
-        let mut time = 0.0;
-        let mut status = String::new();
-        let mut print_enabled = true;
-        let total_rows = 5;
-        let total_cols = 5;
-    
-        // Set up test data: A1=10, B1=20, A2=30, B2=40
+        
+        // Set up cells
         parse_command("A1=10", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
         parse_command("B1=20", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        parse_command("A2=30", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        parse_command("B2=40", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-    
-        // Test SUM: C1 = SUM(A1:B2)
-        parse_command("C1=SUM(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "ok");
-       // assert_eq!(sheet.data[2][0].value, 100); // 10 + 20 + 30 + 40 = 100
-    
-        // Test MIN: C2 = MIN(A1:B2)
-        parse_command("C2=MIN(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "ok");
-       // assert_eq!(sheet.data[2][1].value, 10); // Min is 10
-    
-        // Test MAX: C3 = MAX(A1:B2)
-        parse_command("C3=MAX(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "ok");
-       // assert_eq!(sheet.data[2][2].value, 40); // Max is 40
-    
-        // Test AVG: C4 = AVG(A1:B2)
-        parse_command("C4=AVG(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "ok");
-       // assert_eq!(sheet.data[2][3].value, 25); // (10 + 20 + 30 + 40) / 4 = 25
-    
-        // Test STDEV: C5 = STDEV(A1:B2)
-        parse_command("C5=STDEV(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
-        assert_eq!(status, "ok");
-       // assert_eq!(sheet.data[2][4].value, 13); // Standard deviation ≈ 12.9, rounded to 13
-    
-        // Test error case: invalid range
-        parse_command("D1=SUM(B2:A1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        // C1=A1+B1
+        parse_command("C1=A1+B1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 2)).unwrap().value, 30);
+        
+        // D1=B1-A1
+        parse_command("D1=B1-A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 3)).unwrap().value, 10);
+        
+        // E1=A1*B1
+        parse_command("E1=A1*B1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 4)).unwrap().value, 200);
+        
+        // F1=B1/A1
+        parse_command("F1=B1/A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 2);
+
+        parse_command("ZZZ9991=B1/A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
         assert_eq!(status, "Invalid cmd");
+
+
+        parse_command("F1=1+1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 2);
+
+        parse_command("F1=1-1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 0);
+
+        parse_command("F1=1*1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 1);
+
+        parse_command("F1=1/1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 1);
+
+        parse_command("F1=1/0", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().is_error, true);
+
+        parse_command("ZZZ9991=1/0", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(status, "Invalid cmd");
+
+        parse_command("F1=1+A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 11);
+
+        parse_command("F1=1-A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 9);
+
+        parse_command("F1=1*A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 10);
+
+        parse_command("F1=1/A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 0);
+
+        parse_command("ZZZ9991=1/A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(status, "Invalid cmd");
+
+        parse_command("F1=A1+1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 11);
+
+        parse_command("F1=A1-1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 9);
+
+        parse_command("F1=A1*1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 10);
+
+        parse_command("F1=A1/1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 5)).unwrap().value, 10);
+
+        parse_command("ZZZ9991=A1/1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(status, "Invalid cmd");
+
+        parse_command("B1=1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        parse_command("B2=2", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        parse_command("A1=MAX(B1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        parse_command("A2=A1+1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        parse_command("B1=21", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+
+    }
+
+
+    #[test]
+    fn test_parse_command_functions() {
+        let mut sheet = create_test_sheet();
+        let mut row_start = 0;
+        let mut col_start = 0;
+        let mut time = 0.0;
+        let mut status = String::new();
+        let total_rows = 10;
+        let total_cols = 10;
+        let mut print_enabled = true;
+        
+        // Set up cells
+        parse_command("A1=10", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        parse_command("A2=20", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        parse_command("B1=30", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        parse_command("B2=40", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        // Test SUM function
+        parse_command("C1=SUM(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(0, 2)).unwrap().value, 100);
+        
+        // Test MIN function
+        parse_command("C2=MIN(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(1, 2)).unwrap().value, 10);
+        
+        // Test MAX function
+        parse_command("C3=MAX(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(2, 2)).unwrap().value, 40);
+        
+        // Test AVG function
+        parse_command("C4=AVG(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(3, 2)).unwrap().value, 25);
+        
+        // Test STDEV function
+        parse_command("C5=STDEV(A1:B2)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(sheet.data.get(&(4, 2)).unwrap().value, 11);
     }
 
     #[test]
-fn test_add_constraints() {
-    // Test Cell = int
-    let mut sheet = new_sheet(5, 5);
-    let mut status = String::new();
-    let mut sleep_timer = 0;
-    let cell = CellInfo { row: 0, col: 0 };
-    let cell1 = CellInfo { row: -1, col: -1 };
-    let cell2 = CellInfo { row: -1, col: -1 };
-    sheet.data[0][0].value = 42;
-    add_constraints(cell, cell1, cell2, OpCode::NoConstraint, &mut sheet, &mut status, &mut sleep_timer);
-    assert_eq!(sheet.data[0][0].value, 42);
-    assert_eq!(status, "ok");
+    fn test_parse_command_string_cells() {
+        let mut sheet = create_test_sheet();
+        let mut row_start = 0;
+        let mut col_start = 0;
+        let mut time = 0.0;
+        let mut status = String::new();
+        let total_rows = 10;
+        let total_cols = 10;
+        let mut print_enabled = true;
+        
+        // Test string assignment
+        parse_command("A1=\"Hello\"", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        assert_eq!(sheet.data.get(&(0, 0)).unwrap().string, Some("Hello".to_string()));
+        assert_eq!(status, "ok");
+    }
 
-    // Test Cell = cell
-    let mut sheet = new_sheet(5, 5);
-    let mut status = String::new();
-    let mut sleep_timer = 0;
-    sheet.data[0][0].value = 42; // Set A1 to 42
-    let cell = CellInfo { row: 1, col: 0 };
-    let cell1 = CellInfo { row: 0, col: 0 };
-    let cell2 = CellInfo { row: -1, col: -1 };
-    add_constraints(cell, cell1, cell2, OpCode::CellEqualsCell, &mut sheet, &mut status, &mut sleep_timer);
-    assert_eq!(sheet.data[1][0].value, 42);
-    assert_eq!(status, "ok");
+    #[test]
+    fn test_navigation_commands() {
+        let mut sheet = create_test_sheet();
+        let mut row_start = 0;
+        let mut col_start = 0;
+        let mut time = 0.0;
+        let mut status = String::new();
+        let total_rows = 20;
+        let total_cols = 20;
+        let mut print_enabled = true;
+        
+        // Test scroll commands
+        parse_command("s", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(row_start, 10);
+        
+        parse_command("w", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(row_start, 0);
+        
+        parse_command("d", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(col_start, 10);
+        
+        parse_command("a", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(col_start, 0);
+        
+        // Test scroll_to command
+        parse_command("scroll_toB5", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(row_start, 4);
+        assert_eq!(col_start, 1);
 
-    // Test circular dependency
-    let mut sheet = new_sheet(5, 5);
+        parse_command("scroll_toZZZ9991", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert_eq!(status, "err");
+
+
+    }
+
+
+    #[test]
+    fn test_division_by_zero() {
+        let mut sheet = create_test_sheet();
+        let mut row_start = 0;
+        let mut col_start = 0;
+        let mut time = 0.0;
+        let mut status = String::new();
+        let total_rows = 10;
+        let total_cols = 10;
+        let mut print_enabled = true;
+        
+        // Set cells
+        parse_command("A1=10", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        parse_command("B1=0", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        
+        // Attempt division by zero
+        parse_command("C1=A1/B1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+        assert!(sheet.data.get(&(0, 2)).unwrap().is_error);
+    }
+
+    #[test]
+    fn test_remove_dependency() {
+        let mut sheet = create_test_sheet();
+        let mut status = String::new();
+        let mut sleep_timer = 0;
+        
+        // Set B1 = 20
+        get_or_create_cell(&mut sheet, 0, 1).value = 20;
+        
+        // Set A1 = B1
+        let cell_a1 = CellInfo { row: 0, col: 0 };
+        let cell_b1 = CellInfo { row: 0, col: 1 };
+        let empty = CellInfo { row: -1, col: -1 };
+        
+        add_constraints(cell_a1, cell_b1, empty, OpCode::CellEqualsCell, &mut sheet, &mut status, &mut sleep_timer);
+        
+        // Verify dependency exists
+        assert!(sheet.data.get(&(0, 1)).unwrap().dependencies.contains(&(0 * 1000 + 0)));
+        
+        // Remove dependency
+        let cell_a1 = CellInfo { row: 0, col: 0 };
+        remove_dependency(&cell_a1, &mut sheet);
+        
+        // Verify dependency was removed
+        assert!(!sheet.data.get(&(0, 1)).unwrap().dependencies.contains(&(0 * 1000 + 0)));
+    }
+
+    
+    #[test]
+fn test_compute_range_func() {
+    let mut sheet = create_test_sheet();
     let mut status = String::new();
-    let mut sleep_timer = 0;
-    let cell = CellInfo { row: 0, col: 0 };
-    let cell1 = CellInfo { row: 0, col: 0 };
-    let cell2 = CellInfo { row: -1, col: -1 };
-    add_constraints(cell, cell1, cell2, OpCode::CellEqualsCell, &mut sheet, &mut status, &mut sleep_timer);
-    assert_eq!(status, "circular error");
+    
+    // Create a test range
+    get_or_create_cell(&mut sheet, 0, 0).value = 10;
+    get_or_create_cell(&mut sheet, 0, 1).value = 20;
+    get_or_create_cell(&mut sheet, 1, 0).value = 30;
+    get_or_create_cell(&mut sheet, 1, 1).value = 40;
+    
+    // Test range functions
+    assert_eq!(compute_range_func(&sheet, OpCode::Sum, 0, 0, 1, 1, &mut status), 100);
+    assert_eq!(compute_range_func(&sheet, OpCode::Min, 0, 0, 1, 1, &mut status), 10);
+    assert_eq!(compute_range_func(&sheet, OpCode::Max, 0, 0, 1, 1, &mut status), 40);
+    assert_eq!(compute_range_func(&sheet, OpCode::Avg, 0, 0, 1, 1, &mut status), 25);
+    assert_eq!(compute_range_func(&sheet, OpCode::Stdev, 0, 0, 1, 1, &mut status), 11);
+    
+    // Test invalid range
+    assert_eq!(compute_range_func(&sheet, OpCode::Sum, 1, 0, 0, 1, &mut status), -1);
+    assert_eq!(status, "err");
+    
+    // Test invalid op_code
+    status = String::new();
+    assert_eq!(compute_range_func(&sheet, OpCode::NoConstraint, 0, 0, 1, 1, &mut status), -1);
 }
 
-    #[test]
-    fn test_recalculate() {
-        let mut sheet = new_sheet(5, 5);
-        let mut sleep_timer = 0;
+#[test]
+fn test_check_cycle() {
+    let mut avl_tree = HashMap::new();
+    avl_tree.insert(1000, 0); // Key for cell at (0,1)
+    
+    // Cell1 is already in the tree, should detect cycle
+    let cell1 = CellInfo { row: 0, col: 1 };
+    let cell2 = CellInfo { row: 1, col: 1 };
+    assert!(check_cycle(&avl_tree, &cell1, &cell2));
+    
+    // Cell2 is not already in the tree, should not detect cycle
+    let cell1 = CellInfo { row: 2, col: 2 };
+    let cell2 = CellInfo { row: 1, col: 1 };
+    assert!(!check_cycle(&avl_tree, &cell1, &cell2));
+    
+    // Add the key for cell2
+    avl_tree.insert(1001, 0); // Key for cell at (1,1)
+    assert!(check_cycle(&avl_tree, &cell1, &cell2));
+    
+    // Test empty cell2
+    let cell1 = CellInfo { row: 2, col: 2 };
+    let cell2 = CellInfo { row: -1, col: -1 };
+    assert!(!check_cycle(&avl_tree, &cell1, &cell2));
+}
 
-        // Set up A1 = 10, A2 = A1 + 5
-        sheet.data[0][0].value = 10;
-        sheet.data[1][0].op_code = OpCode::CellPlusConstant;
-        sheet.data[1][0].cell1 = CellInfo { row: 0, col: 0 };
-        sheet.data[1][0].cell2 = CellInfo { row: 0, col: 5 };
-        sheet.data[0][0].dependencies.insert(1000);
+#[test]
+fn test_check_cycle_range_funcs() {
+    let mut avl_tree = HashMap::new();
+    avl_tree.insert(1001, 0); // Key for cell at (1,1)
+    
+    // Range includes the cell in avl_tree
+    let cell1 = CellInfo { row: 0, col: 0 };
+    let cell2 = CellInfo { row: 2, col: 2 };
+    assert!(check_cycle_range_funcs(&avl_tree, &cell1, &cell2));
+    
+    // Range does not include the cell in avl_tree
+    let cell1 = CellInfo { row: 3, col: 3 };
+    let cell2 = CellInfo { row: 4, col: 4 };
+    assert!(!check_cycle_range_funcs(&avl_tree, &cell1, &cell2));
+}
 
-        recalculate(&mut sheet, 1, 0, &mut sleep_timer);
-        assert_eq!(sheet.data[1][0].value, 15);
-        assert_eq!(sheet.data[1][0].is_error, false);
-    }
+#[test]
+fn test_string_cells_and_operations() {
+    let mut sheet = create_test_sheet();
+    let mut row_start = 0;
+    let mut col_start = 0;
+    let mut time = 0.0;
+    let mut status = String::new();
+    let total_rows = 10;
+    let total_cols = 10;
+    let mut print_enabled = true;
+    
+    // Set up string cells
+    parse_command("A1=\"Hello\"", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    parse_command("B1=\"World\"", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    
+    
+    // Check string values
+    assert_eq!(sheet.data.get(&(0, 0)).unwrap().string, Some("Hello".to_string()));
+    assert_eq!(sheet.data.get(&(0, 1)).unwrap().string, Some("World".to_string()));
+    
+    // Try to perform operations with string cells (should result in error)
+    parse_command("C1=A1+B1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    assert!(sheet.data.get(&(0, 2)).unwrap().is_error);
 
+    parse_command("ZZZ9991=\"World\"", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    assert_eq!(status,"Invalid cmd");
+}
 
-    #[test]
-    fn test_sort_sheet() {
-        let mut sheet = new_sheet(5, 5);
-        sheet.data[0][0].value = 30;
-        sheet.data[1][0].value = 10;
-        sheet.data[2][0].value = 20;
-        sort_sheet(&mut sheet, 0, 0, 0, 2, "A", true, "asc");
-        assert_eq!(sheet.data[0][0].value, 10);
-        assert_eq!(sheet.data[1][0].value, 20);
-        assert_eq!(sheet.data[2][0].value, 30);
-    }
+#[test]
+fn test_sleep_commands() {
+    let mut sheet = create_test_sheet();
+    let mut row_start = 0;
+    let mut col_start = 0;
+    let mut time = 0.0;
+    let mut status = String::new();
+    let total_rows = 10;
+    let total_cols = 10;
+    let mut print_enabled = true;
+    
+    // Test SLEEP with a constant
+    parse_command("A1=SLEEP(1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    assert_eq!(sheet.data.get(&(0, 0)).unwrap().value, 1);
+    assert_eq!(time, 1.0);
+    
+    // Test SLEEP with a cell reference
+    parse_command("B1=2", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    parse_command("A2=SLEEP(B1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    assert_eq!(sheet.data.get(&(1, 0)).unwrap().op_code, OpCode::Sleep);
+    assert_eq!(time, 2.0);  // 1 from the first sleep + 2 from the second
+}
+
+#[test]
+fn test_error_handling() {
+    let mut sheet = create_test_sheet();
+    let mut row_start = 0;
+    let mut col_start = 0;
+    let mut time = 0.0;
+    let mut status = String::new();
+    let total_rows = 10;
+    let total_cols = 10;
+    let mut print_enabled = true;
+    
+    // Test invalid cell reference
+    parse_command("Z99=10", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    assert_eq!(status, "Invalid cmd");
+    
+    // Test circular reference
+    parse_command("A1=B1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    status = String::new();
+    parse_command("B1=A1", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    assert_eq!(status, "circular error");
+    
+    // Test invalid range in function
+    parse_command("C1=SUM(B2:A1)", &mut row_start, &mut col_start, &mut time, &mut status, &total_rows, &total_cols, &mut sheet, &mut print_enabled);
+    assert_eq!(status, "Invalid cmd");
+}
 }

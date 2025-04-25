@@ -1,48 +1,49 @@
 mod sheet_functions;
 mod parser;
 mod calculate_functions;
+mod ui_sheet_functions;
 
-#[cfg(feature = "gui")]
-mod ui;
-#[cfg(feature = "gui")]
-mod app;
+// #[cfg(feature = "gui")]
+// mod ui;
+// #[cfg(feature = "gui")]
+// mod app;
 
 use std::env;
 use crate::sheet_functions::Sheet;
 
-#[cfg(feature = "gui")]
-use ui::app_impl::{SpreadsheetApp, Sheets};
-#[cfg(feature = "gui")]
-use egui::{FontData, FontDefinitions, FontFamily};
+// #[cfg(feature = "gui")]
+// use ui::app_impl::{SpreadsheetApp, Sheets};
+// #[cfg(feature = "gui")]
+// use egui::{FontData, FontDefinitions, FontFamily};
 
-#[cfg(feature = "gui")]
-fn setup_custom_fonts(ctx: &egui::Context) {
-    let mut fonts = FontDefinitions::default();
-    fonts.font_data.insert(
-        "noto_sans".to_owned(),
-        FontData::from_static(include_bytes!("../assets/fonts/NotoSans-VariableFont_wdth,wght.ttf")),
-    );
-    fonts.font_data.insert(
-        "emoji".to_owned(),
-        FontData::from_static(include_bytes!("../assets/fonts/Symbola-Emoji.ttf")),
-    );
+// #[cfg(feature = "gui")]
+// fn setup_custom_fonts(ctx: &egui::Context) {
+//     let mut fonts = FontDefinitions::default();
+//     fonts.font_data.insert(
+//         "noto_sans".to_owned(),
+//         FontData::from_static(include_bytes!("../assets/fonts/NotoSans-VariableFont_wdth,wght.ttf")),
+//     );
+//     fonts.font_data.insert(
+//         "emoji".to_owned(),
+//         FontData::from_static(include_bytes!("../assets/fonts/Symbola-Emoji.ttf")),
+//     );
 
-    {
-        let prop = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
-        prop.clear();
-        prop.push("noto_sans".to_owned());
-        prop.push("emoji".to_owned());
-    }
+//     {
+//         let prop = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
+//         prop.clear();
+//         prop.push("noto_sans".to_owned());
+//         prop.push("emoji".to_owned());
+//     }
 
-    {
-        let mono = fonts.families.get_mut(&FontFamily::Monospace).unwrap();
-        mono.clear();
-        mono.push("noto_sans".to_owned());
-        mono.push("emoji".to_owned());
-    }
+//     {
+//         let mono = fonts.families.get_mut(&FontFamily::Monospace).unwrap();
+//         mono.clear();
+//         mono.push("noto_sans".to_owned());
+//         mono.push("emoji".to_owned());
+//     }
 
-    ctx.set_fonts(fonts);
-}
+//     ctx.set_fonts(fonts);
+// }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -115,5 +116,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         compile_error!("Either feature 'gui' or 'no_gui' must be enabled.");
     }
 
-    Ok(())
+    // Ok(())
 }
