@@ -423,7 +423,7 @@ pub fn sort_button_parser(app: &mut SpreadsheetApp,sort_asc : bool) {
 }
 
 #[cfg(feature = "gui")]
-mod tuple_key_map {
+pub mod tuple_key_map {
     use std::collections::HashMap;
     use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
@@ -452,7 +452,7 @@ mod tuple_key_map {
 }
 
 #[cfg(feature = "gui")]
-mod nested_tuple_key_map {
+pub mod nested_tuple_key_map {
     use std::collections::HashMap;
     use serde::{Serialize, Deserialize, Serializer, Deserializer};
 

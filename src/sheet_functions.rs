@@ -9,9 +9,66 @@ use serde::ser::SerializeTuple;
 use serde::de::{self, Visitor, SeqAccess};
 #[cfg(feature = "gui")]
 use std::fmt;
-#[cfg(feature = "gui")]
-use crate::ui::{tuple_key_map, nested_tuple_key_map};
 use std::string::String;
+
+#[cfg(feature = "gui")]
+pub mod tuple_key_map {
+    use std::collections::HashMap;
+    use serde::{Serialize, Deserialize, Serializer, Deserializer};
+
+    pub fn serialize<S, T>(
+        map: &HashMap<(i16, i16), T>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        let vec: Vec<_> = map.iter().map(|(&(r, c), v)| ((r, c), v)).collect();
+        vec.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, T>(
+        deserializer: D,
+    ) -> Result<HashMap<(i16, i16), T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        let vec: Vec<((i16, i16), T)> = Deserialize::deserialize(deserializer)?;
+        Ok(vec.into_iter().collect())
+    }
+}
+
+#[cfg(feature = "gui")]
+pub mod nested_tuple_key_map {
+    use std::collections::HashMap;
+    use serde::{Serialize, Deserialize, Serializer, Deserializer};
+
+    pub fn serialize<S, T>(
+        map: &HashMap<((i16, i16), (i16, i16)), T>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        let vec: Vec<_> = map.iter().map(|(&(k1, k2), v)| (((k1, k2)), v)).collect();
+        vec.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, T>(
+        deserializer: D,
+    ) -> Result<HashMap<((i16, i16), (i16, i16)), T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        let vec: Vec<(((i16, i16), (i16, i16)), T)> = Deserialize::deserialize(deserializer)?;
+        Ok(vec.into_iter().collect())
+    }
+}
+
 
 #[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
