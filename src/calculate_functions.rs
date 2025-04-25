@@ -6,6 +6,19 @@ use core::hash;
 use std::string::String;
 use std::u8::MIN;
 
+
+/// Computes the sum of values in a specified range of cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - The spreadsheet containing the cell data.
+/// * `val_row1` - The starting row index of the range (0-based).
+/// * `c1` - The starting column index of the range (0-based).
+/// * `val_row2` - The ending row index of the range (0-based).
+/// * `c2` - The ending column index of the range (0-based).
+///
+/// # Returns
+/// The sum of all cell values in the specified range. Non-existent cells are treated as having a value of 0.
+
 pub fn sum(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32 {
     let mut a = 0;
     let hash_map_size = sheet.data.len();
@@ -34,6 +47,18 @@ pub fn sum(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
     }
     a
 }
+
+/// Finds the minimum value in a specified range of cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - The spreadsheet containing the cell data.
+/// * `val_row1` - The starting row index of the range (0-based).
+/// * `c1` - The starting column index of the range (0-based).
+/// * `val_row2` - The ending row index of the range (0-based).
+/// * `c2` - The ending column index of the range (0-based).
+///
+/// # Returns
+/// The minimum value in the specified range. Non-existent cells are treated as having a value of 0.
 
 pub fn min(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32 {
     let mut a = i32::MAX;
@@ -73,6 +98,20 @@ pub fn min(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
     a
 }
 
+
+/// Finds the maximum value in a specified range of cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - The spreadsheet containing the cell data.
+/// * `val_row1` - The starting row index of the range (0-based).
+/// * `c1` - The starting column index of the range (0-based).
+/// * `val_row2` - The ending row index of the range (0-based).
+/// * `c2` - The ending column index of the range (0-based).
+///
+/// # Returns
+/// The maximum value in the specified range. Non-existent cells are treated as having a value of 0.
+/// Returns `i32::MIN` if the range is empty.
+
 pub fn max(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32 {
     let mut a = i32::MIN;
     let hash_map_size = sheet.data.len();
@@ -111,6 +150,19 @@ pub fn max(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
     a
 }
 
+/// Computes the average of values in a specified range of cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - The spreadsheet containing the cell data.
+/// * `val_row1` - The starting row index of the range (0-based).
+/// * `c1` - The starting column index of the range (0-based).
+/// * `val_row2` - The ending row index of the range (0-based).
+/// * `c2` - The ending column index of the range (0-based).
+///
+/// # Returns
+/// The average of all cell values in the specified range, rounded down to the nearest integer.
+/// Returns -1 if the range is empty.
+
 pub fn avg(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32 {
     let total = sum(sheet, val_row1, c1, val_row2, c2);
     let row2 = val_row2 as i32;
@@ -125,6 +177,20 @@ pub fn avg(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32
         -1
     }
 }
+
+/// Computes the standard deviation of values in a specified range of cells in the spreadsheet.
+///
+/// # Arguments
+/// * `sheet` - The spreadsheet containing the cell data.
+/// * `val_row1` - The starting row index of the range (0-based).
+/// * `c1` - The starting column index of the range (0-based).
+/// * `val_row2` - The ending row index of the range (0-based).
+/// * `c2` - The ending column index of the range (0-based).
+///
+/// # Returns
+/// The standard deviation of cell values in the specified range, rounded to the nearest integer.
+/// Returns 0 if the range is empty.
+
 pub fn stdev(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i32 {
     let avg_val = avg(sheet, val_row1, c1, val_row2, c2);
     let mut total : i64 = 0;
@@ -158,6 +224,19 @@ pub fn stdev(sheet: &Sheet, val_row1: i16, c1: i16, val_row2: i16, c2: i16) -> i
     std.round() as i32
 }
 
+/// Computes the result of a binary operation between two values based on the specified `OpCode`.
+///
+/// # Arguments
+/// * `op_code` - The operation to perform (e.g., addition, subtraction, multiplication, division).
+/// * `cell_value` - The first operand (typically a cell's value).
+/// * `cell_value2` - The second operand (a cell's value or a constant).
+/// * `status` - A mutable string to store error messages if the operation fails.
+///
+/// # Returns
+/// A tuple containing:
+/// * The computed result as an `i32`.
+/// * A boolean indicating whether an error occurred (e.g., division by zero).
+
 pub fn compute_cell(op_code: OpCode, cell_value: i32, cell_value2: i32, status: &mut String) -> (i32, bool){
     match op_code {
         CellPlusCell | CellPlusConstant => (cell_value + cell_value2,false),
@@ -187,6 +266,20 @@ pub fn compute_cell(op_code: OpCode, cell_value: i32, cell_value2: i32, status: 
         }
     }
 }
+
+
+/// Computes the result of a range-based function on a specified range of cells.
+///
+/// # Arguments
+/// * `sheet` - The spreadsheet containing the cell data.
+/// * `op_code` - The range-based operation to perform (e.g., `Sum`, `Min`, `Max`, `Avg`, `Stdev`).
+/// * `row1` - The starting row index of the range (0-based).
+/// * `col1` - The starting column index of the range (0-based).
+/// * `row2` - The ending row index of the range (0-based).
+/// * `col2` - The ending column index of the range (0-based).
+/// * `status` - A mutable string to store error messages if the operation fails.
+/// # Returns
+/// The result of the range-based operation as an `i32`. Returns -1 if the range is invalid or the operation is unsupported.
 
 pub fn compute_range_func(sheet: &Sheet, op_code: OpCode, row1: i16, col1: i16, row2: i16, col2: i16, status: &mut String) -> i32 {
     if col1 > col2 || row1 > row2 {

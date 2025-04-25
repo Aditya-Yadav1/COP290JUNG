@@ -58,6 +58,15 @@ pub struct Sheet {
     pub tuup: HashMap<((i16,i16),(i16,i16)),Vec<(i16,i16)>>,
 }
 
+/// Retrieves or creates a cell at the specified row and column in the sheet.
+///
+/// # Arguments
+/// * `sheet` - The mutable spreadsheet to operate on.
+/// * `row` - The row index of the cell.
+/// * `col` - The column index of the cell.
+///
+/// # Returns
+/// A mutable reference to the cell.
 pub fn get_or_create_cell(sheet: &mut Sheet, row: i32, col: i32) -> &mut Cell {
     sheet.data.entry((row as i16, col as i16)).or_insert_with(|| Cell {
         value: 0,
@@ -70,12 +79,30 @@ pub fn get_or_create_cell(sheet: &mut Sheet, row: i32, col: i32) -> &mut Cell {
     })
 }
 // is_valid_cell
+/// Checks if a cell is within the valid bounds of the spreadsheet.
+///
+/// # Arguments
+/// * `row` - The row index to check.
+/// * `col` - The column index to check.
+/// * `total_rows` - The total number of rows in the spreadsheet.
+/// * `total_cols` - The total number of columns in the spreadsheet.
+///
+/// # Returns
+/// `true` if the cell is within bounds, `false` otherwise.
 pub fn is_valid_cell(row: i32, col: i32, total_rows: i32, total_cols: i32) -> bool {
     row >= 0 && row < total_rows && col >= 0 && col < total_cols
 }           
 
 
 impl Sheet {
+    /// Creates a new spreadsheet with the specified dimensions.
+    ///
+    /// # Arguments
+    /// * `rows` - The number of rows in the spreadsheet.
+    /// * `cols` - The number of columns in the spreadsheet.
+    ///
+    /// # Returns
+    /// A new `Sheet` instance.
     pub fn new(rows: i32, cols: i32) -> Self {
         let mut buul = Vec::with_capacity(rows as usize);
 
@@ -102,6 +129,13 @@ impl Sheet {
     }
 }
 
+/// Converts a column number to its corresponding alphabetical column name (e.g., 0 -> "A", 1 -> "B").
+///
+/// # Arguments
+/// * `col_num` - The column number (0-based).
+///
+/// # Returns
+/// The alphabetical column name as a `String`.
 
 pub fn col_num_to_col_name(col_num: i32) -> String {
     let mut col_name = String::new();
@@ -115,7 +149,13 @@ pub fn col_num_to_col_name(col_num: i32) -> String {
     col_name = col_name.chars().rev().collect();
     return col_name;
 }
-
+/// Converts an alphabetical column name to its corresponding column number (e.g., "A" -> 0, "B" -> 1).
+///
+/// # Arguments
+/// * `col_name` - The alphabetical column name.
+///
+/// # Returns
+/// The column number (0-based).
 pub fn col_name_to_col_num(col_name: &str) -> i32 {
     let mut col  = -1;
     for c in col_name.chars() {
@@ -124,7 +164,14 @@ pub fn col_name_to_col_num(col_name: &str) -> i32 {
     }
     return col;
 }
-  
+/// Prints a portion of the spreadsheet to the console, starting from the specified coordinates.
+///
+/// # Arguments
+/// * `start_row` - The starting row index.
+/// * `start_col` - The starting column index.
+/// * `total_rows` - The total number of rows in the spreadsheet.
+/// * `total_cols` - The total number of columns in the spreadsheet.
+/// * `sheet` - The mutable spreadsheet to print.
 pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: i32, sheet: &mut Sheet) {
     let max_col_display: i32 = start_col + std::cmp::min(total_cols - start_col, 10);
     let max_row_display: i32 = start_row + std::cmp::min(total_rows - start_row, 10);
@@ -160,7 +207,15 @@ pub fn print_sheet(start_row: i32, start_col: i32, total_rows: i32, total_cols: 
         println!();
     }
 }
-
+/// Checks for circular dependencies between two cells.
+///
+/// # Arguments
+/// * `avl_tree` - A HashMap tracking cell dependencies and their indegrees.
+/// * `cell1` - The first cell to check.
+/// * `cell2` - The second cell to check.
+///
+/// # Returns
+/// `true` if a cycle is detected, `false` otherwise.
 pub fn check_cycle(avl_tree: &std::collections::HashMap<i32, i32>,cell1: &CellInfo,cell2: &CellInfo,) -> bool {
     let key1 = cell1.col as i32 * 1000 + cell1.row as i32;
     if avl_tree.contains_key(&key1) {
@@ -175,6 +230,16 @@ pub fn check_cycle(avl_tree: &std::collections::HashMap<i32, i32>,cell1: &CellIn
     }
     false
 }
+
+/// Checks for circular dependencies in range-based functions.
+///
+/// # Arguments
+/// * `avl_tree` - A HashMap tracking cell dependencies and their indegrees.
+/// * `cell1` - The top-left cell of the range.
+/// * `cell2` - The bottom-right cell of the range.
+///
+/// # Returns
+/// `true` if a cycle is detected, `false` otherwise.
 pub fn check_cycle_range_funcs(avl_tree: &std::collections::HashMap<i32, i32>, cell1: &CellInfo, cell2: &CellInfo) -> bool {
     for (&key, _) in avl_tree.iter() {
         let col = key / 1000;
@@ -186,7 +251,13 @@ pub fn check_cycle_range_funcs(avl_tree: &std::collections::HashMap<i32, i32>, c
     }
     false
 }
-
+/// Recalculates the value of a cell based on its operation and dependencies.
+///
+/// # Arguments
+/// * `sheet` - The mutable spreadsheet to operate on.
+/// * `row` - The row index of the cell.
+/// * `col` - The column index of the cell.
+/// * `sleep_timer` - A mutable reference to track accumulated sleep time.
 pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut i32) { 
     
     let (op_code, cell1, cell2) = {
@@ -295,7 +366,14 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
     }
 }
 
-
+/// Performs a topological sort on the dependency graph to determine the order of cell recalculation.
+///
+/// # Arguments
+/// * `avl_tree` - A HashMap tracking cell dependencies and their indegrees.
+/// * `sheet` - The spreadsheet containing the cell data.
+///
+/// # Returns
+/// A vector of cell keys in topological order.
 
 pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, sheet: &Sheet) -> Vec<i32> {
     let mut queue = std::collections::VecDeque::new();
@@ -342,6 +420,11 @@ pub fn topological_sort(avl_tree: &mut std::collections::HashMap<i32, i32>, shee
 
 use OpCode::*;
 
+/// Removes dependencies for a specified cell, updating dependent cells and ranges.
+///
+/// # Arguments
+/// * `cell` - The cell whose dependencies should be removed.
+/// * `sheet` - The mutable spreadsheet to operate on.
 pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
     let row = cell.row as i32;
     let col = cell.col as i32;
@@ -400,6 +483,12 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
     }
 }
 
+/// Adds a cell and its dependencies to the dependency tree for cycle detection and topological sorting.
+///
+/// # Arguments
+/// * `avl_tree` - The HashMap tracking cell dependencies and their indegrees.
+/// * `cell` - The cell to add to the tree.
+/// * `sheet` - The spreadsheet containing the cell data.
 pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: CellInfo, sheet: &Sheet) {
     // Get the current cell from the HashMap
     if let Some(curr_cell) = sheet.data.get(&(cell.row as i16, cell.col as i16)) {
@@ -440,6 +529,16 @@ pub fn add_to_tree(avl_tree: &mut std::collections::HashMap<i32, i32>, cell: Cel
     }
 }
 
+/// Adds a new constraint to a cell, updating its operation and dependencies.
+///
+/// # Arguments
+/// * `curr_cell` - The cell to apply the constraint to.
+/// * `cell1` - The first cell reference for the operation.
+/// * `cell2` - The second cell reference for the operation.
+/// * `op_code` - The operation to apply.
+/// * `sheet` - The mutable spreadsheet to operate on.
+/// * `status` - A mutable string to store the operation status (e.g., "ok" or "circular error").
+/// * `sleep_timer` - A mutable reference to track accumulated sleep time.
 pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_code: OpCode,sheet: &mut Sheet,status: &mut String,sleep_timer: &mut i32,) {
     let key = curr_cell.col as i32 * 1000 + curr_cell.row as i32;
     let mut ans = 0;
