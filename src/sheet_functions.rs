@@ -1,13 +1,20 @@
 use crate::calculate_functions::compute_cell;
 use crate::calculate_functions::compute_range_func;
 use std::collections::{HashSet,HashMap};
+#[cfg(feature = "gui")]
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
+#[cfg(feature = "gui")]
 use serde::ser::SerializeTuple;
+#[cfg(feature = "gui")]
 use serde::de::{self, Visitor, SeqAccess};
+#[cfg(feature = "gui")]
 use std::fmt;
+#[cfg(feature = "gui")]
+use crate::ui::{tuple_key_map, nested_tuple_key_map};
 use std::string::String;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpCode {
     NoConstraint,
     CellEqualsCell,
@@ -32,12 +39,14 @@ pub enum OpCode {
 
 
 #[derive(Clone,Debug)]
+#[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
 pub struct CellInfo {
     pub row: i16,
     pub col: i16,
 }
 
 #[derive(Clone,Debug)]
+#[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
 pub struct Cell {
     pub value: i32,
     pub is_error: bool,
@@ -49,12 +58,15 @@ pub struct Cell {
 }
  
 
-// #[derive(Clone,Deserialize,Serialize)]
+#[cfg_attr(feature = "gui", derive(Serialize, Deserialize))]
+#[derive(Clone)]
 pub struct Sheet {
     pub rows: i32,
     pub cols: i32,
     pub buul: Vec<Vec<bool>>,
+    #[cfg_attr(feature = "gui", serde(with = "tuple_key_map"))]
     pub data: HashMap<(i16, i16), Cell>,
+    #[cfg_attr(feature = "gui", serde(with = "nested_tuple_key_map"))]
     pub tuup: HashMap<((i16,i16),(i16,i16)),Vec<(i16,i16)>>,
 }
 

@@ -14,6 +14,8 @@ use crate::sheet_functions::Sheet;
 use ui::app_impl::{SpreadsheetApp, Sheets};
 #[cfg(feature = "gui")]
 use egui::{FontData, FontDefinitions, FontFamily};
+#[cfg(feature = "gui")]
+mod ui_sheet_functions;
 
 #[cfg(feature = "gui")]
 fn setup_custom_fonts(ctx: &egui::Context) {

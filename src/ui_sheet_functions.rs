@@ -8,93 +8,93 @@ use crate::sheet_functions::OpCode;
 use crate::sheet_functions::{col_name_to_col_num, add_to_tree, topological_sort, recalculate, CellInfo};
 use serde::ser::SerializeTuple;
 
-impl Serialize for CellInfo {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut tuple = serializer.serialize_tuple(2)?;
-        tuple.serialize_element(&self.row)?;
-        tuple.serialize_element(&self.col)?;
-        tuple.end()
-    }
-}
+// impl Serialize for CellInfo {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         let mut tuple = serializer.serialize_tuple(2)?;
+//         tuple.serialize_element(&self.row)?;
+//         tuple.serialize_element(&self.col)?;
+//         tuple.end()
+//     }
+// }
 
-impl<'de> Deserialize<'de> for CellInfo {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct CellInfoVisitor;
+// impl<'de> Deserialize<'de> for CellInfo {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         struct CellInfoVisitor;
 
-        impl<'de> Visitor<'de> for CellInfoVisitor {
-            type Value = CellInfo;
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a tuple [row, col]")
-            }
-            fn visit_seq<V>(self, mut seq: V) -> Result<CellInfo, V::Error>
-            where
-                V: SeqAccess<'de>,
-            {
-                let row = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let col = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
-                Ok(CellInfo { row, col })
-            }
-        }
-        deserializer.deserialize_tuple(2, CellInfoVisitor)
-    }
-}
+//         impl<'de> Visitor<'de> for CellInfoVisitor {
+//             type Value = CellInfo;
+//             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//                 formatter.write_str("a tuple [row, col]")
+//             }
+//             fn visit_seq<V>(self, mut seq: V) -> Result<CellInfo, V::Error>
+//             where
+//                 V: SeqAccess<'de>,
+//             {
+//                 let row = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+//                 let col = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+//                 Ok(CellInfo { row, col })
+//             }
+//         }
+//         deserializer.deserialize_tuple(2, CellInfoVisitor)
+//     }
+// }
 
-impl Serialize for Cell {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut tuple = serializer.serialize_tuple(7)?;
-        tuple.serialize_element(&self.value)?;
-        tuple.serialize_element(&self.string)?;
-        tuple.serialize_element(&self.is_error)?;
-        tuple.serialize_element(&self.op_code)?;
-        tuple.serialize_element(&self.cell1)?;
-        tuple.serialize_element(&self.cell2)?;
-        tuple.serialize_element(&self.dependencies)?;
-        tuple.end()
-    }
-}
+// impl Serialize for Cell {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         let mut tuple = serializer.serialize_tuple(7)?;
+//         tuple.serialize_element(&self.value)?;
+//         tuple.serialize_element(&self.string)?;
+//         tuple.serialize_element(&self.is_error)?;
+//         tuple.serialize_element(&self.op_code)?;
+//         tuple.serialize_element(&self.cell1)?;
+//         tuple.serialize_element(&self.cell2)?;
+//         tuple.serialize_element(&self.dependencies)?;
+//         tuple.end()
+//     }
+// }
 
-impl<'de> Deserialize<'de> for Cell {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct CellVisitor;
+// impl<'de> Deserialize<'de> for Cell {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         struct CellVisitor;
 
-        impl<'de> Visitor<'de> for CellVisitor {
-            type Value = Cell;
+//         impl<'de> Visitor<'de> for CellVisitor {
+//             type Value = Cell;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a compact Cell as a 7-element tuple")
-            }
+//             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//                 formatter.write_str("a compact Cell as a 7-element tuple")
+//             }
 
-            fn visit_seq<V>(self, mut seq: V) -> Result<Cell, V::Error>
-            where
-                V: SeqAccess<'de>,
-            {
-                Ok(Cell {
-                    value: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?,
-                    string: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
-                    is_error: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
-                    op_code: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
-                    cell1: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
-                    cell2: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
-                    dependencies: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?,
-                })
-            }
-        }
+//             fn visit_seq<V>(self, mut seq: V) -> Result<Cell, V::Error>
+//             where
+//                 V: SeqAccess<'de>,
+//             {
+//                 Ok(Cell {
+//                     value: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?,
+//                     string: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
+//                     is_error: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
+//                     op_code: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
+//                     cell1: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
+//                     cell2: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
+//                     dependencies: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?,
+//                 })
+//             }
+//         }
 
-        deserializer.deserialize_tuple(7, CellVisitor)
-    }
-}
+//         deserializer.deserialize_tuple(7, CellVisitor)
+//     }
+// }
         
 
 pub fn update_dependencies(old_cell_row: i16,old_cell_col: i16,new_cell_row: i16,new_cell_col: i16,sheet: &mut Sheet,

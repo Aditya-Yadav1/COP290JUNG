@@ -421,3 +421,61 @@ pub fn sort_button_parser(app: &mut SpreadsheetApp,sort_asc : bool) {
         app.time = 0.0;
     }
 }
+
+#[cfg(feature = "gui")]
+mod tuple_key_map {
+    use std::collections::HashMap;
+    use serde::{Serialize, Deserialize, Serializer, Deserializer};
+
+    pub fn serialize<S, T>(
+        map: &HashMap<(i16, i16), T>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        let vec: Vec<_> = map.iter().map(|(&(r, c), v)| ((r, c), v)).collect();
+        vec.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, T>(
+        deserializer: D,
+    ) -> Result<HashMap<(i16, i16), T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        let vec: Vec<((i16, i16), T)> = Deserialize::deserialize(deserializer)?;
+        Ok(vec.into_iter().collect())
+    }
+}
+
+#[cfg(feature = "gui")]
+mod nested_tuple_key_map {
+    use std::collections::HashMap;
+    use serde::{Serialize, Deserialize, Serializer, Deserializer};
+
+    pub fn serialize<S, T>(
+        map: &HashMap<((i16, i16), (i16, i16)), T>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: Serialize,
+    {
+        let vec: Vec<_> = map.iter().map(|(&(k1, k2), v)| (((k1, k2)), v)).collect();
+        vec.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, T>(
+        deserializer: D,
+    ) -> Result<HashMap<((i16, i16), (i16, i16)), T>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        let vec: Vec<(((i16, i16), (i16, i16)), T)> = Deserialize::deserialize(deserializer)?;
+        Ok(vec.into_iter().collect())
+    }
+}
