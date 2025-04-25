@@ -262,10 +262,19 @@ pub fn sort_sheet(
         }
     }
 
+    if is_column{
     for i in row1..=row2 {
         for j in col1..=col2 {
             if let Some(cell) = vec.get((i - row1) as usize).and_then(|row| row.get((j - col1) as usize)) {
                 sheet.data.insert((i as i16, j as i16), cell.clone());
+            }
+        }
+    }}else{
+        for i in col1..=col2 {
+            for j in row1..=row2 {
+                if let Some(cell) = vec.get((i - col1) as usize).and_then(|row| row.get((j - row1) as usize)) {
+                    sheet.data.insert((j as i16, i as i16), cell.clone());
+                }
             }
         }
     }
