@@ -1,72 +1,73 @@
 mod sheet_functions;
 mod parser;
 mod calculate_functions;
+mod ui_sheet_functions;
 
-#[cfg(feature = "gui")]
-mod ui;
-#[cfg(feature = "gui")]
-mod app;
+// #[cfg(feature = "gui")]
+// mod ui;
+// #[cfg(feature = "gui")]
+// mod app;
 
 use std::env;
 use crate::sheet_functions::Sheet;
 
-#[cfg(feature = "gui")]
-use ui::app_impl::{SpreadsheetApp, Sheets};
-#[cfg(feature = "gui")]
-use egui::{FontData, FontDefinitions, FontFamily};
+// #[cfg(feature = "gui")]
+// use ui::app_impl::{SpreadsheetApp, Sheets};
+// #[cfg(feature = "gui")]
+// use egui::{FontData, FontDefinitions, FontFamily};
 
-#[cfg(feature = "gui")]
-fn setup_custom_fonts(ctx: &egui::Context) {
-    let mut fonts = FontDefinitions::default();
-    fonts.font_data.insert(
-        "noto_sans".to_owned(),
-        FontData::from_static(include_bytes!("../assets/fonts/NotoSans-VariableFont_wdth,wght.ttf")),
-    );
-    fonts.font_data.insert(
-        "emoji".to_owned(),
-        FontData::from_static(include_bytes!("../assets/fonts/Symbola-Emoji.ttf")),
-    );
+// #[cfg(feature = "gui")]
+// fn setup_custom_fonts(ctx: &egui::Context) {
+//     let mut fonts = FontDefinitions::default();
+//     fonts.font_data.insert(
+//         "noto_sans".to_owned(),
+//         FontData::from_static(include_bytes!("../assets/fonts/NotoSans-VariableFont_wdth,wght.ttf")),
+//     );
+//     fonts.font_data.insert(
+//         "emoji".to_owned(),
+//         FontData::from_static(include_bytes!("../assets/fonts/Symbola-Emoji.ttf")),
+//     );
 
-    {
-        let prop = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
-        prop.clear();
-        prop.push("noto_sans".to_owned());
-        prop.push("emoji".to_owned());
-    }
+//     {
+//         let prop = fonts.families.get_mut(&FontFamily::Proportional).unwrap();
+//         prop.clear();
+//         prop.push("noto_sans".to_owned());
+//         prop.push("emoji".to_owned());
+//     }
 
-    {
-        let mono = fonts.families.get_mut(&FontFamily::Monospace).unwrap();
-        mono.clear();
-        mono.push("noto_sans".to_owned());
-        mono.push("emoji".to_owned());
-    }
+//     {
+//         let mono = fonts.families.get_mut(&FontFamily::Monospace).unwrap();
+//         mono.clear();
+//         mono.push("noto_sans".to_owned());
+//         mono.push("emoji".to_owned());
+//     }
 
-    ctx.set_fonts(fonts);
-}
+//     ctx.set_fonts(fonts);
+// }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
-    #[cfg(feature = "gui")]
-    {
-        if args.len() == 2 && args[1] == "gui" {
-            let options = eframe::NativeOptions::default();
-            return eframe::run_native(
-                "Rusty Spreadsheet GUI",
-                options,
-                Box::new(|cc| {
-                    setup_custom_fonts(&cc.egui_ctx);
-                    egui_extras::install_image_loaders(&cc.egui_ctx);
-                    let sheet = Sheet::new(20, 20);
-                    let sheets = vec![Sheets {
-                        sheet: sheet.clone(),
-                        name: String::from("Sheet 1"),
-                    }];
-                    Box::new(SpreadsheetApp::new(sheets))
-                }),
-            ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
-        }
-    }
+    // #[cfg(feature = "gui")]
+    // {
+    //     if args.len() == 2 && args[1] == "gui" {
+    //         let options = eframe::NativeOptions::default();
+    //         return eframe::run_native(
+    //             "Rusty Spreadsheet GUI",
+    //             options,
+    //             Box::new(|cc| {
+    //                 setup_custom_fonts(&cc.egui_ctx);
+    //                 egui_extras::install_image_loaders(&cc.egui_ctx);
+    //                 let sheet = Sheet::new(20, 20);
+    //                 let sheets = vec![Sheets {
+    //                     sheet: sheet.clone(),
+    //                     name: String::from("Sheet 1"),
+    //                 }];
+    //                 Box::new(SpreadsheetApp::new(sheets))
+    //             }),
+    //         ).map_err(|e| Box::new(e) as Box<dyn std::error::Error>);
+    //     }
+    // }
 
     #[cfg(feature = "no_gui")]
     {
@@ -117,5 +118,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         compile_error!("Either feature 'gui' or 'no_gui' must be enabled.");
     }
 
-    Ok(())
+    // Ok(())
 }

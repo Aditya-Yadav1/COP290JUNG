@@ -10,7 +10,7 @@ use std::time::Instant;
 use crate::sheet_functions::OpCode;
 use crate::sheet_functions::OpCode::*;
 use std::string::String; 
-use crate::sheet_functions::get_or_create_cell;
+use crate::sheet_functions::get_or_create_cell;  
 
 pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
     // function to get opcode for the case of int op cell or cell op int
@@ -67,7 +67,6 @@ pub fn parse_command(command:&str, row_start:&mut i32, col_start:&mut i32, time:
     let re_sleep_int = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\((\d+)\)$").unwrap();
     let re_sleep_cell = Regex::new(r"^([A-Z]+)(\d+)=SLEEP\(([A-Z]+)(\d+)\)$").unwrap();
     let re_string_cell = Regex::new(r#"^([A-Z]+)(\d+)="(.*)"$"#).unwrap();  
-    let re_sort = Regex::new(r"^SORT\(\s*([A-Z]+)(\d+)\s*:\s*([A-Z]+)(\d+)\s*;\s*([A-Z]+|\d+)\s*;\s*(asc|desc)\s*\)$").unwrap();
     remove_space(&mut command);
 
    
@@ -340,72 +339,6 @@ else if let Some(caps) = re_cell_eq_func.captures(&command) {
             sheet_functions::add_constraints(cell, cell1, cell2, op_code, sheet, status, &mut sleep_timer);
         } else {*status = String::from("err");}
     } 
-    else if let Some(caps) = re_sort.captures(&command) {
-        let ref_col1 = caps.get(1).unwrap().as_str();
-        let ref_row1: i32 = caps.get(2).unwrap().as_str().parse().unwrap();
-        let ref_col2 = caps.get(3).unwrap().as_str();
-        let ref_row2: i32 = caps.get(4).unwrap().as_str().parse().unwrap();
-        let sort_key = caps.get(5).unwrap().as_str(); 
-        let sort_order = caps.get(6).unwrap().as_str();
-
-        let is_column = sort_key.chars().all(|c| c.is_ascii_alphabetic());
-        let col1 = col_name_to_col_num(ref_col1);
-        let row1 = ref_row1 - 1;
-        let col2 = col_name_to_col_num(ref_col2);
-        let row2 = ref_row2 - 1;
-
-        if (col2<col1) || (row2<row1){
-            *status = String::from("wrong range");
-            *time = 0.0;
-            return;
-        }
-        if is_column {
-            let sort_col = col_name_to_col_num(sort_key);
-            if sort_col > col2 || sort_col < col1 {
-                *status = String::from("sorted column out of range");
-                *time = 0.0;
-                return;
-            }
-            for i in row1..=row2 {
-                if let Some(cell) = sheet.data.get(&(i as i16, sort_col as i16)) {
-                    if cell.string.is_some() {
-                        *status = String::from("sorted column has string");
-                        *time = 0.0;
-                        return;
-                    }
-                }
-            }
-        }
-        else{
-            let sort_row = sort_key.parse::<i32>().unwrap() - 1;
-            if sort_row > row2 || sort_row < row1{
-                *status = String::from("sorted row out of range");
-                *time = 0.0;
-                return;
-            }
-            for i in col1..=col2{
-                if let Some(cell) = sheet.data.get(&(sort_row as i16, i as i16)) {
-                    if cell.string.is_some() {
-                        *status = String::from("sorted row has string");
-                        *time = 0.0;
-                        return;
-                    }
-                }
-            }
-        }
-        for i in row1..=row2{
-            for j in col1..=col2{
-                if let Some(cell) = sheet.data.get(&(i as i16, j as i16)) {
-                    if cell.op_code != NoConstraint && cell.op_code != String {
-                        *status = String::from("range has constraints");
-                        *time = 0.0;
-                        return;
-                    }
-                }
-            }
-        }
-        sheet_functions::sort_sheet(sheet, col1, row1, col2, row2, sort_key, is_column, sort_order);
-    }
     else {*status = String::from("Invalid cmd");}
 
     let elapsed = start_time.elapsed();
