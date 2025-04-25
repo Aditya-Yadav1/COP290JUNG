@@ -16,7 +16,7 @@ pub fn get_op_code(op_code: char, constopcell: bool) -> OpCode {
     // function to get opcode for the case of int op cell or cell op int
     match op_code {
         '+' => CellPlusConstant,
-        '-' => CellMinusConstant,
+        '-' => if constopcell {ConstantMinusCell} else {CellMinusConstant},
         '*' => CellTimesConstant,
         '/' => if constopcell { ConstantDividesCell } else { CellDivideConstant },
         _ => NoConstraint

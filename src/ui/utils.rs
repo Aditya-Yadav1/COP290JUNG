@@ -245,10 +245,11 @@ pub fn get_cell_formula(row: i16, col: i16, cell: &Cell) -> String {
                 cell.cell2.row + 1
             )
         }
-        OpCode::CellPlusConstant | OpCode::CellMinusConstant | OpCode::CellTimesConstant | OpCode::CellDivideConstant => {
+        OpCode::CellPlusConstant | OpCode::CellMinusConstant | OpCode::CellTimesConstant | OpCode::CellDivideConstant | OpCode::ConstantMinusCell => {
             let operator = match cell.op_code {
                 OpCode::CellPlusConstant => "+",
                 OpCode::CellMinusConstant => "-",
+                OpCode::ConstantMinusCell => "-",
                 OpCode::CellTimesConstant => "*",
                 OpCode::CellDivideConstant => "/",
                 _ => unreachable!(),
@@ -387,15 +388,11 @@ pub fn sort_button_parser(app: &mut SpreadsheetApp,sort_asc : bool) {
         let row1;
         let col2;
         let row2;
-        println!("here");
         if let Some(caps) = re_cell.captures(&app.sort_range_start.to_string()){
             let col_in = caps.get(1).unwrap().as_str();
             let row_in = caps.get(2).unwrap().as_str();
-            println!("{col_in}");
             col1 = sheet_functions::col_name_to_col_num(col_in);
-            println!("here");
             row1 = row_in.parse::<i32>().unwrap();
-            println!("here");
         }
         else{
             app.status = "Invalid range start".to_string();

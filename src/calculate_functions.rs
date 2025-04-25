@@ -162,6 +162,7 @@ pub fn compute_cell(op_code: OpCode, cell_value: i32, cell_value2: i32, status: 
     match op_code {
         CellPlusCell | CellPlusConstant => (cell_value + cell_value2,false),
         CellMinusCell | CellMinusConstant => (cell_value - cell_value2, false),
+        ConstantMinusCell => (cell_value2 - cell_value, false),
         CellTimesCell | CellTimesConstant => (cell_value * cell_value2, false),
         CellDivideCell | CellDivideConstant => {
             if cell_value2 == 0 {

@@ -17,6 +17,7 @@ pub enum OpCode {
     CellDivideCell,
     CellPlusConstant,
     CellMinusConstant,
+    ConstantMinusCell,
     CellTimesConstant,
     CellDivideConstant,
     ConstantDividesCell,
@@ -320,7 +321,7 @@ pub fn recalculate(sheet: &mut Sheet, row: usize, col: usize, sleep_timer: &mut 
                     (val, err1) = compute_cell(op_code, a_value, b_value, &mut String::new());
                 }
             }
-            CellPlusConstant | CellMinusConstant | CellTimesConstant | CellDivideConstant | ConstantDividesCell => {
+            CellPlusConstant | CellMinusConstant | CellTimesConstant | CellDivideConstant | ConstantDividesCell |ConstantMinusCell => {
                 let a = get_or_create_cell(sheet, cell1.row as i32, cell1.col as i32);
                 if a.is_error || a.string.is_some() {
                     err = true;
@@ -448,7 +449,7 @@ pub fn remove_dependency(cell: &CellInfo, sheet: &mut Sheet) {
 
     match op_code {
         OpCode::NoConstraint => {}
-        OpCode::CellEqualsCell| OpCode::CellPlusConstant| OpCode::CellTimesConstant| OpCode::CellMinusConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell| OpCode::Sleep => {
+        OpCode::CellEqualsCell| OpCode::CellPlusConstant| OpCode::CellTimesConstant| OpCode::CellMinusConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell| OpCode::Sleep |OpCode::ConstantMinusCell => {
             if let Some(dependent_cell) = sheet.data.get_mut(&(cell1.row as i16, cell1.col as i16)) {
                 dependent_cell.dependencies.remove(&(col * 1000 + row));
             } 
@@ -589,7 +590,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             }
             ref_cell.dependencies.insert(key);
         }
-        OpCode::CellPlusConstant| OpCode::CellMinusConstant| OpCode::CellTimesConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell => {
+        OpCode::CellPlusConstant| OpCode::CellMinusConstant| OpCode::CellTimesConstant| OpCode::CellDivideConstant| OpCode::ConstantDividesCell |OpCode ::ConstantMinusCell=> {
             if check_cycle(&avl_tree, &cell1, &temp) {
                 *status = String::from("circular error");return;
             }
