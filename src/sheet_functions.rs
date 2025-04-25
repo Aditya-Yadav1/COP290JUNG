@@ -450,11 +450,7 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
     let mut avl_tree: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     avl_tree.insert(key, 0);
     let temp = CellInfo { row: -1, col: -1 };
-    let start_time = std::time::Instant::now();
     add_to_tree(&mut avl_tree, curr_cell.clone(), sheet); 
-    let add_time = start_time.elapsed();
-    println!("Time taken to add to tree: {:?}", add_time);
-    let start_time2 = std::time::Instant::now();
     match op_code {
         OpCode::NoConstraint | String => {remove_dependency(&curr_cell, sheet);
             let cell = get_or_create_cell(sheet, curr_cell.row as i32, curr_cell.col as i32); 
@@ -523,20 +519,33 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             if check_cycle_range_funcs(&avl_tree, &cell1, &cell2) {
                 *status = String::from("circular error");return;
             }
-            println!("{}",start_time2.elapsed().as_secs_f64());
-            for i in cell1.row..=cell2.row {
-                for j in cell1.col..=cell2.col {
-                    sheet.buul[i as usize][j as usize] = true; // Mark the cell as used
-                    if let Some(ref_cell) = sheet.data.get(&(i as i16, j as i16)) {
-                        if ref_cell.is_error || ref_cell.string.is_some() {
-                            calc_error = true;
+            let key1 = (cell1.col , cell1.row );
+            let key2 = (cell2.col, cell2.row);
+            if sheet.tuup.contains_key(&(key1,key2)){
+                let vec = sheet.tuup.get(&(key1,key2)).unwrap();
+                if vec.len() > 0{
+                    let row = vec[0].1;
+                    let col = vec[0].0;
+                    let cell = get_or_create_cell(sheet, row as i32, col as i32);
+                    if cell.is_error || cell.string.is_some() {
+                        calc_error = true;
+                    }
+                }
+                
+            }
+            else{
+                for i in cell1.row..=cell2.row {
+                    for j in cell1.col..=cell2.col {
+                        sheet.buul[i as usize][j as usize] = true; // Mark the cell as used
+                        if let Some(ref_cell) = sheet.data.get(&(i as i16, j as i16)) {
+                            if ref_cell.is_error || ref_cell.string.is_some() {
+                                calc_error = true;
+                            }
                         }
                     }
                 }
             }
-            println!("{}",start_time2.elapsed().as_secs_f64());
             remove_dependency(&curr_cell, sheet);
-            println!("remove dep{}",start_time2.elapsed().as_secs_f64());
             if let Some(existing) = sheet.tuup.get_mut(&((cell1.col, cell1.row), (cell2.col, cell2.row))) {
                 existing.push((curr_cell.col, curr_cell.row));
             } else {
@@ -547,7 +556,6 @@ pub fn add_constraints(curr_cell: CellInfo,cell1: CellInfo,cell2: CellInfo,op_co
             cell.cell2 = cell2.clone();
             cell.op_code = op_code;
             ans = compute_range_func(sheet,op_code,cell1.row as i16,cell1.col as i16,cell2.row as i16,cell2.col as i16,status,);
-            println!("comp{}",start_time2.elapsed().as_secs_f64());
         
         }
 
