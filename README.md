@@ -60,15 +60,3 @@ The following files are not provided but are assumed to exist based on reference
 - **`fonts.rs`**: Defines the `FONTS` array and `setup_custom_fonts` for font customization.
 - **`themes.rs`**: Defines the `THEMES` array and `Theme` struct for theme customization.
 
-## Installation
-
-### Prerequisites
-- **Rust**: Install Rust using `rustup` (https://www.rust-lang.org/tools/install).
-- **Cargo**: Included with Rust, used for building and running the project.
-- **Dependencies**: The project uses `eframe`, `egui`, `serde`, `serde_json`, `regex`, and other crates. These are specified in `Cargo.toml`.
-
-### Steps
-1. **Clone the Repository**:
-   ```bash
-   git clone <repository-url>
-   cd spreadsheet-app
